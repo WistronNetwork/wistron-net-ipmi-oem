@@ -18,7 +18,7 @@
 #include <sdbusplus/message/types.hpp>
 #include <oemcommands.hpp>
 #include <vector>
-#include <fstream> 
+#include <fstream>
 #include <filesystem>
 #include <string>
 #include <phosphor-logging/log.hpp>
@@ -37,8 +37,8 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemReadDiagLog()
     char log2[] = "/tmp/ipmi_log_tmp";
     std::string line;
     std::ifstream f1(log1);
-    
-    if(!f1.good()) 
+
+    if(!f1.good())
         return ipmi::responseSuccess();
 
     while(!f1.eof() && count < MAX_COUNT){
@@ -82,7 +82,7 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemI2cReadWrite(uint8_t bus, uint8_t add
     uint8_t *rbuf = (uint8_t *) malloc(rd_cnt * sizeof(uint8_t));
     i2c_rdwr_msg_transfer(dev, addr << 1, wbuf, wdata.size(), rbuf, rd_cnt);
     std::vector<uint8_t> rdata(rbuf, rbuf + rd_cnt);
-    
+
     close(dev);
     free(rbuf);
     return ipmi::responseSuccess(rdata);
@@ -92,9 +92,9 @@ void registerOEMFunctions()
 {
     phosphor::logging::log<phosphor::logging::level::INFO>(
         "Registering OEM commands");
-    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemThree, WIS_CMD_READ_DIAG_LOG,
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_READ_DIAG_LOG,
             ipmi::Privilege::User, ipmiOemReadDiagLog);
-    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemThree, WIS_CMD_I2C_READ_WRITE,
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_I2C_READ_WRITE,
             ipmi::Privilege::User, ipmiOemI2cReadWrite);
 }
 }

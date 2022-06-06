@@ -23,8 +23,8 @@ namespace ipmi
 
 enum wistron_oem_cmds
 {
+    WIS_CMD_I2C_READ_WRITE = 0x25,
     WIS_CMD_READ_DIAG_LOG = 0x80,
-    WIS_CMD_I2C_READ_WRITE = 0x81,
 };
 
 } // namespace ipmi
