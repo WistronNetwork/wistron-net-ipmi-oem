@@ -23,6 +23,10 @@
 #include <string>
 #include <phosphor-logging/log.hpp>
 #include <openbmc/obmc-i2c.h>
+#include <gpiod.h>
+#include <openbmc/libgpio.h>
+
+using namespace phosphor::logging;
 
 namespace ipmi
 {
@@ -88,13 +92,189 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemI2cReadWrite(uint8_t bus, uint8_t add
     return ipmi::responseSuccess(rdata);
 }
 
+ipmi::RspType<> ipmiOemSetGPIO(uint8_t num, uint8_t direction, uint8_t level)
+{
+    gpio_desc_t *gdesc = NULL;
+    gpio_direction_t dir;
+    gpio_value_t value;
+
+    // open gpio
+    gdesc = gpio_open_by_offset("aspeed-gpio", num);
+    if (gdesc == NULL) {
+		return ipmi::responseUnspecifiedError();
+    }
+
+    // check whether direction is available
+    dir = gpio_direction_str_to_type(direction ? "out" : "in");
+	if (dir == GPIO_DIRECTION_INVALID) {
+		phosphor::logging::log<level::ERR>("invalid direction:",
+			                               entry("offset: %d", num));
+		gpio_close(gdesc);
+	    return ipmi::responseUnspecifiedError();
+	}
+
+    // set direction
+    if (gpio_set_direction(gdesc, dir) != 0) {
+		phosphor::logging::log<level::ERR>("failed to set gpio direction:",
+			                               entry("offset: %d", num));
+		gpio_close(gdesc);
+	    return ipmi::responseUnspecifiedError();
+	}
+
+    // set value
+	value = (level ? GPIO_VALUE_HIGH : GPIO_VALUE_LOW);
+	if (gpio_set_value(gdesc, value) != 0) {
+		phosphor::logging::log<level::ERR>("failed to set gpio value:",
+			                                entry("offset: %d", num));
+		gpio_close(gdesc);
+	    return ipmi::responseUnspecifiedError();
+	}
+
+    gpio_close(gdesc);
+    return ipmi::responseSuccess();
+}
+
+ipmi::RspType<uint8_t, uint8_t> ipmiOemGetGPIO(uint8_t num)
+{
+    gpio_desc_t *gdesc = NULL;
+    gpio_direction_t dir;
+    gpio_value_t value;
+    uint8_t direction;
+
+    // open gpio
+    gdesc = gpio_open_by_offset("aspeed-gpio", num);
+    if (gdesc == NULL)
+		return ipmi::responseUnspecifiedError();
+
+    if (gpio_get_direction(gdesc, &dir) != 0) {
+		phosphor::logging::log<level::ERR>("failed to get gpio direction",
+                                            entry("offset: %d", num));
+		gpio_close(gdesc);
+	    return ipmi::responseUnspecifiedError();
+	}
+
+    // get direction
+    direction = (strcmp(gpio_direction_type_to_str(dir), "out") == 0)
+                ? 1 : 0;
+
+    //get value
+    if (gpio_get_value(gdesc, &value) != 0) {
+		phosphor::logging::log<level::ERR>("failed to get gpio value:",
+                                            entry("offset: %d", num));
+		gpio_close(gdesc);
+	    return ipmi::responseUnspecifiedError();
+	}
+
+    gpio_close(gdesc);
+    return ipmi::responseSuccess(direction, (uint8_t)value);
+}
+
+static void readallgpio(struct gpiod_chip *chip,
+                               std::vector<uint8_t>& result)
+{
+    struct gpiod_line_iter *iter;
+    unsigned int offset;
+    struct gpiod_line *line;
+    const char *consumer;
+    int direction;
+    uint8_t direction_val = 0, level_val = 0;
+    gpio_desc_t *gdesc = NULL;
+    gpio_value_t value;
+    char shadow[10];
+
+    iter = gpiod_line_iter_new(chip);
+    if (!iter)
+		phosphor::logging::log<level::ERR>("error creating line iterator");
+
+    // read each gpio port
+    gpiod_foreach_line(iter, line) {
+        offset = gpiod_line_offset(line);
+        consumer = gpiod_line_consumer(line);
+        direction = gpiod_line_direction(line);
+
+        // export gpio if it is not occupied by another process.
+        snprintf(shadow, 10, "GPIO%d", offset);
+        if (!gpiod_line_is_used(line) && direction == 1) {
+            gpio_export_by_offset("aspeed-gpio", offset, shadow);
+        }
+
+        // gpio is readable in these two situation
+        if ((!gpiod_line_is_used(line) && direction == 1) ||
+             (consumer && strcmp("sysfs", consumer) == 0)) {
+            // open gpio
+            gdesc = gpio_open_by_offset("aspeed-gpio", offset);
+            if (gdesc == NULL) {
+                phosphor::logging::log<level::ERR>("failed to open gpio:",
+                                                    entry("offset: %d", offset));
+                return;
+            }
+
+            //get value
+            if (gpio_get_value(gdesc, &value) != 0) {
+                phosphor::logging::log<level::ERR>("failed to get gpio value:",
+                                                    entry("offset: %d", offset));
+                gpio_close(gdesc);
+                return;
+            }
+            gpio_close(gdesc);
+
+            // set gpio direction and value as one bit into 'result' variable.
+            if (offset%8 == 0 && offset/8 >= 1) {
+                direction_val |= (direction == 1) ? 0 : 1 << (offset % 8);
+                level_val |= (uint8_t)value << (offset % 8);
+                result.push_back(direction_val);
+                result.push_back(level_val);
+                direction_val = 0;
+                level_val = 0;
+            } else {
+                direction_val |= (direction == 1) ? 0 : 1 << (offset % 8);
+                level_val |= (uint8_t)value << (offset % 8);
+            }
+        }
+
+        // unexport gpio
+        if (!gpiod_line_is_used(line) && direction == 1)
+            gpio_unexport(shadow);
+    }
+
+    // record the remain data in the tail of gpio list
+    if (!(offset%8 == 0 && offset/8 >= 1)) {
+        result.push_back(direction_val);
+        result.push_back(level_val);
+    }
+
+    gpiod_line_iter_free(iter);
+}
+
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetAllGPIO()
+{
+    struct gpiod_chip_iter *chip_iter;
+    struct gpiod_chip *chip;
+    std::vector<uint8_t> result;
+
+    chip_iter = gpiod_chip_iter_new();
+    if (!chip_iter)
+		phosphor::logging::log<level::ERR>("error accessing GPIO chips");
+
+    gpiod_foreach_chip(chip_iter, chip)
+        readallgpio(chip, result);
+
+    return ipmi::responseSuccess(result);
+}
+
 void registerOEMFunctions()
 {
-    phosphor::logging::log<phosphor::logging::level::INFO>(
+    phosphor::logging::log<level::INFO>(
         "Registering OEM commands");
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_READ_DIAG_LOG,
             ipmi::Privilege::User, ipmiOemReadDiagLog);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_I2C_READ_WRITE,
             ipmi::Privilege::User, ipmiOemI2cReadWrite);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_GPIO,
+            ipmi::Privilege::User, ipmiOemSetGPIO);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_GPIO,
+            ipmi::Privilege::User, ipmiOemGetGPIO);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_ALL_GPIO,
+            ipmi::Privilege::User, ipmiOemGetAllGPIO);
 }
 }

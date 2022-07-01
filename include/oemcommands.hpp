@@ -24,6 +24,9 @@ namespace ipmi
 enum wistron_oem_cmds
 {
     WIS_CMD_I2C_READ_WRITE = 0x25,
+    WIS_CMD_SET_GPIO = 0x26,
+    WIS_CMD_GET_GPIO = 0x27,
+    WIS_CMD_GET_ALL_GPIO = 0x28,
     WIS_CMD_READ_DIAG_LOG = 0x80,
 };
 
