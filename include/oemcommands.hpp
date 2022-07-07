@@ -23,6 +23,8 @@ namespace ipmi
 
 enum wistron_oem_cmds
 {
+    WIS_CMD_SET_FAN_SPEED_CONTROL = 0x21,
+    WIS_CMD_GET_FAN_SPEED_CONTROL = 0x22,
     WIS_CMD_I2C_READ_WRITE = 0x25,
     WIS_CMD_SET_GPIO = 0x26,
     WIS_CMD_GET_GPIO = 0x27,

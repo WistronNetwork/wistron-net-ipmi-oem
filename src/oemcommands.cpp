@@ -25,6 +25,8 @@
 #include <openbmc/obmc-i2c.h>
 #include <gpiod.h>
 #include <openbmc/libgpio.h>
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
 
 using namespace phosphor::logging;
 
@@ -262,6 +264,76 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetAllGPIO()
     return ipmi::responseSuccess(result);
 }
 
+/** @brief implements the set fan speed control command
+ *  @param mode - Control Mode; 1h = Manually Control, 0h = Auto Control
+ *  @param duty - Fan PWM Duty Cycle; 00h ~ 64h for 0% ~ 100% PWM duty cycle.
+ *                This field is valid only if the mode equals to 01h
+ *
+ *  @returns IPMI completion code
+ */
+ipmi::RspType<> ipmiOemSetFanSpeedControl(uint8_t mode, uint8_t duty)
+{
+    const int MAX_COMMAND = 64;
+    char command[MAX_COMMAND];
+
+    // TODO: Mode control - currently only force mode (Manually Control)
+
+    if (mode == 1) {
+        snprintf(command, MAX_COMMAND,
+                 "/usr/local/bin/fan-util --set %d ", duty);
+
+        auto ret = system(command);
+        if (ret) {
+            return ipmi::responseUnspecifiedError();
+        }
+    }
+
+    return ipmi::responseSuccess();
+}
+
+/** @brief implements the set fan speed control command
+ *
+ *  @returns IPMI completion code plus response data
+ *   - mode - Control Mode; 1h = Manually Control, 0h = Auto Control
+ *   - duty - Fan PWM Duty Cycle; 00h ~ 64h for 0% ~ 100% PWM duty cycle.
+ */
+ipmi::RspType<uint8_t, uint8_t> ipmiOemGetFanSpeedControl()
+{
+    const int MAX_BUFFER = 256;
+    char buffer[MAX_BUFFER];
+    uint8_t duty = 0;
+    uint8_t mode = 0;
+    std::string value;
+    std::vector<std::string> result;
+    FILE * stream;
+
+    // TODO: Mode control - currently only force mode (Manually Control)
+    mode = 1;
+
+    stream = popen("/usr/local/bin/fan-util --get", "r");
+    if (stream) {
+        while (!feof(stream)) {
+            if (fgets(buffer, MAX_BUFFER, stream) != NULL) {
+                value.append(buffer);
+            }
+        }
+
+        auto ret = pclose(stream);
+        if (ret) {
+            return ipmi::responseUnspecifiedError();
+        }
+
+        /* fan-util output format should like below:
+           Example - "Fan 1 RPM: 12344 PWM: 100 %".
+           PWM value will be index 5 after do string split.
+           If the format is different, it might got error */
+        boost::split(result, value, boost::is_any_of(" "));
+        duty = boost::numeric_cast<uint8_t>(boost::lexical_cast<int>(result[5]));
+    }
+
+    return ipmi::responseSuccess(mode, duty);
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -276,5 +348,9 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemGetGPIO);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_ALL_GPIO,
             ipmi::Privilege::User, ipmiOemGetAllGPIO);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_FAN_SPEED_CONTROL,
+            ipmi::Privilege::User, ipmiOemSetFanSpeedControl);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_FAN_SPEED_CONTROL,
+            ipmi::Privilege::User, ipmiOemGetFanSpeedControl);
 }
 }
