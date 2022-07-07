@@ -1,24 +1,6 @@
-### Wistron-net IPMI OEM Commands (0x30)
+### Wistron IPMI OEM Commands (0x30)
 
 * This series of commands are mainly used for diagnostic.
-
-#### Read diag log Command: 0x80
-
-* Read logs from BMC directory '/tmp/ipmi_log'.
-* The maximun response 'N' is 1024.
-
-`Request`
-
-|Byte |Data
-|---- |----
-|NA   |NA
-
-`Response`
-
-|Byte |Data
-|---- |----
-|1    |Completion code(0x00).
-|(2:N)|Response ascii code which reads from '/tmp/ipmi_log'.
 
 #### Set Fan Speed Control Command: 0x21
 
@@ -132,3 +114,26 @@
 |1    |Completion code(0x00).
 |2N   |Byte 2N: GPIO Direction of Port18E
 |2N+1 |Byte 2N+1: GPIO Level of Port18E
+
+
+### Wistron-net IPMI OEM Commands (0x32)
+
+* This series of commands are mainly used for diagnostic.
+
+#### Read diag log Command: 0x80
+
+* Read logs from BMC directory '/tmp/ipmi_log'.
+* The maximun response 'N' is 1024.
+
+`Request`
+
+|Byte |Data
+|---- |----
+|NA   |NA
+
+`Response`
+
+|Byte |Data
+|---- |----
+|1    |Completion code(0x00).
+|(2:N)|Response ascii code which reads from '/tmp/ipmi_log'.

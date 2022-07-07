@@ -338,7 +338,7 @@ void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
         "Registering OEM commands");
-    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_READ_DIAG_LOG,
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemTwo, WIS_CMD_READ_DIAG_LOG,
             ipmi::Privilege::User, ipmiOemReadDiagLog);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_I2C_READ_WRITE,
             ipmi::Privilege::User, ipmiOemI2cReadWrite);
