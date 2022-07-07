@@ -1,4 +1,4 @@
-### Wistron-net IPMI OEM Commands (0x34)
+### Wistron-net IPMI OEM Commands (0x30)
 
 * This series of commands are mainly used for diagnostic.
 
@@ -20,10 +20,45 @@
 |1    |Completion code(0x00).
 |(2:N)|Response ascii code which reads from '/tmp/ipmi_log'.
 
-#### I2c Read Write Command: 0x81
+#### Set Fan Speed Control Command: 0x21
 
-* Read logs from BMC directory '/tmp/ipmi_log'.
-* The maximun response 'N' is 1024.
+* This Command is used to set fan control mode and fan PWM.
+
+`Request`
+
+|Byte |Data
+|---- |----
+|1    |**Control Mode**<br>1h = Manually Control<br>0h = Auto Control (follow fan control algorithm)
+|2    |**Fan PWM Duty Cycle**<br>00h ~ 64h for 0% ~ 100% PWM duty cycle<br>This field is valid only if the request data byte #1 equals to 01h
+
+`Response`
+
+|Byte |Data
+|---- |----
+|1    |Completion code(0x00).
+
+#### Get Fan Speed Control Command: 0x22
+
+* This Command is used to get fan control mode and fan PWM.
+
+`Request`
+
+|Byte |Data
+|---- |----
+|NA   |NA
+
+`Response`
+
+|Byte |Data
+|---- |----
+|1    |Completion code(0x00).
+|2    |**Control Mode**<br>1h = Manually Control<br>0h = Auto Control (follow fan control algorithm)
+|3    |**Fan PWM Duty Cycle**<br>00h ~ 64h for 0% ~ 100% PWM duty cycle
+
+#### I2C Read Write Command: 0x25
+
+* Because standard IPMI Master Write-Read command only support 8 buses (ID 0 ~ 7).
+* This OEM command is created to write-read all I2C buses of the BMC.
 
 `Request`
 
@@ -41,3 +76,59 @@
 |---- |----
 |1    |Completion code(0x00).
 |(2:N)|Data read from specified salve address.
+
+#### Set GPIO Command: 0x26
+
+* This Command is used to set in/out direction and high/low level for a specific GPIO.
+* GPIO number = port number * 8 + pin order of the port.
+
+`Request`
+
+|Byte |Data
+|---- |----
+|1    |GPIO Number
+|2    |**GPIO Direction**<br>0 = Input<br>1 = Output
+|3    |**GPIO Level**<br>0 = Low<br>1 = high<br>Note: If data byte 2 is 0, data byte 3 will be ignored
+
+`Response`
+
+|Byte |Data
+|---- |----
+|1    |Completion code(0x00).
+
+#### Get GPIO Command: 0x27
+
+* This Command is used to get in/out direction and high/low level for a specific GPIO.
+* GPIO number = port number * 8 + pin order of the port.
+
+`Request`
+
+|Byte |Data
+|---- |----
+|1    |GPIO Number
+
+`Response`
+
+|Byte |Data
+|---- |----
+|1    |Completion code(0x00).
+|2    |**GPIO Direction**<br>0 = Input<br>1 = Output
+|3    |**GPIO Level**<br>0 = Low<br>1 = high
+
+#### Get All GPIO Command: 0x28
+
+* This Command is used to get direction and level of all GPIOs of BMC.
+
+`Request`
+
+|Byte |Data
+|---- |----
+|NA   |NA
+
+`Response`
+
+|Byte |Data
+|---- |----
+|1    |Completion code(0x00).
+|2N   |Byte 2N: GPIO Direction of Port18E
+|2N+1 |Byte 2N+1: GPIO Level of Port18E
