@@ -82,7 +82,8 @@ add_custom_command(OUTPUT include/ipmi-whitelist.hpp
 
 add_library (wistronoemcmds
              SHARED
-             src/oemcommands.cpp)
+             src/oemcommands.cpp
+             src/storagecommands.cpp)
 
 set_target_properties (wistronoemcmds PROPERTIES VERSION "0.1.0")
 set_target_properties (wistronoemcmds PROPERTIES SOVERSION "0")
