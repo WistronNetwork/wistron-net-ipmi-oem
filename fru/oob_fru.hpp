@@ -17,20 +17,9 @@
 #pragma once
 
 #include <ipmid/api-types.hpp>
+#define FRU_MAX 2
 
-namespace ipmi
-{
-
-enum wistron_oem_cmds
-{
-    WIS_CMD_SET_FAN_SPEED_CONTROL = 0x21,
-    WIS_CMD_GET_FAN_SPEED_CONTROL = 0x22,
-    WIS_CMD_I2C_READ_WRITE = 0x25,
-    WIS_CMD_SET_GPIO = 0x26,
-    WIS_CMD_GET_GPIO = 0x27,
-    WIS_CMD_GET_ALL_GPIO = 0x28,
-    WIS_CMD_SET_FRU_MFG_DATE = 0x3f,
-    WIS_CMD_READ_DIAG_LOG = 0x80,
+const char* frulist[FRU_MAX] = {
+    "/sys/bus/i2c/devices/8-0051/eeprom", // fru 0: bmc
+    "/sys/bus/i2c/devices/3-0054/eeprom"  // fru 1: MB
 };
-
-} // namespace ipmi

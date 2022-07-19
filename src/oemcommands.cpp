@@ -27,6 +27,7 @@
 #include <openbmc/libgpio.h>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <fru.hpp>
 
 using namespace phosphor::logging;
 
@@ -334,6 +335,46 @@ ipmi::RspType<uint8_t, uint8_t> ipmiOemGetFanSpeedControl()
     return ipmi::responseSuccess(mode, duty);
 }
 
+ipmi::RspType<> ipmiOemSetFruMfgDate(uint8_t fru, uint8_t lsbdate,
+                                     uint8_t middate, uint8_t msbdate)
+{
+    FILE *fp;
+    uint8_t buffer[3] = {};
+    size_t numread, numwritten;
+    uint8_t date_offset;
+
+    if (FRU_MAX <= 0)
+        return responseOutOfSpace();
+    fp = fopen(frulist[fru],"rb+");
+    if (NULL == fp) {
+        return ipmi::responseUnspecifiedError();
+    } else {
+        fseek (fp , 3, SEEK_SET);
+        memset(buffer, 0, 1);
+        numread = fread(buffer, 1, 1, fp);
+
+        if (numread == 0) {
+            fclose(fp);
+            return ipmi::responseUnspecifiedError();
+        }
+        date_offset = buffer[0] * 8 + 3;
+
+        fseek (fp , date_offset, SEEK_SET);
+        buffer[0] = lsbdate;
+        buffer[1] = middate;
+        buffer[2] = msbdate;
+
+        numwritten = fwrite(buffer, 1, 3, fp);
+        if (numwritten == 0) {
+            fclose(fp);
+            return ipmi::responseUnspecifiedError();
+        }
+    }
+    fclose(fp);
+
+    return ipmi::responseSuccess();
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -352,5 +393,7 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemSetFanSpeedControl);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_FAN_SPEED_CONTROL,
             ipmi::Privilege::User, ipmiOemGetFanSpeedControl);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_FRU_MFG_DATE,
+            ipmi::Privilege::User, ipmiOemSetFruMfgDate);
 }
 }

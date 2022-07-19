@@ -115,6 +115,23 @@
 |2N   |Byte 2N: GPIO Direction of Port18E
 |2N+1 |Byte 2N+1: GPIO Level of Port18E
 
+#### Get All GPIO Command: 0x3f
+
+* This Command is used to set fru date.
+
+`Request`
+
+|Byte |Data
+|---- |----
+|1    |Time byte 1 (LSB)
+|2    |Time byte 2
+|3    |Time byte 3 (MSB)
+
+`Response`
+
+|Byte |Data
+|---- |----
+|1    |Completion code(0x00).
 
 ### Wistron-net IPMI OEM Commands (0x32)
 
