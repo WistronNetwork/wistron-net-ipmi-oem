@@ -330,6 +330,8 @@ ipmi::RspType<uint8_t, uint8_t> ipmiOemGetFanSpeedControl()
            If the format is different, it might got error */
         boost::split(result, value, boost::is_any_of(" "));
         duty = boost::numeric_cast<uint8_t>(boost::lexical_cast<int>(result[5]));
+    } else {
+        return ipmi::responseUnspecifiedError();
     }
 
     return ipmi::responseSuccess(mode, duty);
@@ -375,6 +377,142 @@ ipmi::RspType<> ipmiOemSetFruMfgDate(uint8_t fru, uint8_t lsbdate,
     return ipmi::responseSuccess();
 }
 
+/** @brief implements the set I2C mux master select command
+ *  @param select - 0: BMC, 1: CPU
+ *
+ *  @returns IPMI completion code
+ */
+ipmi::RspType<> ipmiOemSetI2cMuxMaster(uint8_t select)
+{
+    const int MAX_COMMAND = 64;
+    char command[MAX_COMMAND];
+
+    if (select == 0) {
+        snprintf(command, MAX_COMMAND, "/usr/local/bin/mux-util --set i2c bmc");
+    } else if (select == 1) {
+        snprintf(command, MAX_COMMAND, "/usr/local/bin/mux-util --set i2c cpu");
+    } else {
+        return ipmi::responseCommandNotAvailable();
+    }
+
+    auto ret = system(command);
+    if (ret) {
+        return ipmi::responseUnspecifiedError();
+    }
+
+    return ipmi::responseSuccess();
+}
+
+/** @brief implements the get I2C mux master select command
+ *
+ *  @returns IPMI completion code plus response data
+ *   - select - 0: BMC, 1: CPU
+ */
+ipmi::RspType<uint8_t> ipmiOemGetI2cMuxMaster()
+{
+    const int MAX_BUFFER = 32;
+    char buffer[MAX_BUFFER];
+    uint8_t select = 0;
+    std::string value;
+    std::vector<std::string> result;
+    FILE * stream;
+
+    stream = popen("/usr/local/bin/mux-util --get i2c", "r");
+    if (stream) {
+        while (!feof(stream)) {
+            if (fgets(buffer, MAX_BUFFER, stream) != NULL) {
+                value.append(buffer);
+            }
+        }
+
+        auto ret = pclose(stream);
+        if (ret) {
+            return ipmi::responseUnspecifiedError();
+        }
+
+        // mux-util output format is "BMC" or "CPU"
+        if (value.compare(0, 3, "BMC") == 0) {
+            select = 0;
+        } else if (value.compare(0, 3, "CPU") == 0) {
+            select = 1;
+        } else {
+            return ipmi::responseUnspecifiedError();
+        }
+    } else {
+        return ipmi::responseUnspecifiedError();
+    }
+
+    return ipmi::responseSuccess(select);
+}
+
+/** @brief implements the set UART mux master select command
+ *  @param select - 0: BMC, 1: CPU
+ *
+ *  @returns IPMI completion code
+ */
+ipmi::RspType<> ipmiOemSetUartMuxMaster(uint8_t select)
+{
+    const int MAX_COMMAND = 64;
+    char command[MAX_COMMAND];
+
+    if (select == 0) {
+        snprintf(command, MAX_COMMAND, "/usr/local/bin/mux-util --set uart bmc");
+    } else if (select == 1) {
+        snprintf(command, MAX_COMMAND, "/usr/local/bin/mux-util --set uart cpu");
+    } else {
+        return ipmi::responseCommandNotAvailable();
+    }
+
+    auto ret = system(command);
+    if (ret) {
+        return ipmi::responseUnspecifiedError();
+    }
+
+    return ipmi::responseSuccess();
+}
+
+/** @brief implements the get UART mux master select command
+ *
+ *  @returns IPMI completion code plus response data
+ *   - select - 0: BMC, 1: CPU
+ */
+ipmi::RspType<uint8_t> ipmiOemGetUartMuxMaster()
+{
+    const int MAX_BUFFER = 32;
+    char buffer[MAX_BUFFER];
+    uint8_t select = 0;
+    std::string value;
+    std::vector<std::string> result;
+    FILE * stream;
+
+    stream = popen("/usr/local/bin/mux-util --get uart", "r");
+    if (stream) {
+        while (!feof(stream)) {
+            if (fgets(buffer, MAX_BUFFER, stream) != NULL) {
+                value.append(buffer);
+            }
+        }
+
+        auto ret = pclose(stream);
+        if (ret) {
+            return ipmi::responseUnspecifiedError();
+        }
+
+        // mux-util output format is "BMC" or "CPU"
+        if (value.compare(0, 3, "BMC") == 0) {
+            select = 0;
+        } else if (value.compare(0, 3, "CPU") == 0) {
+            select = 1;
+        } else {
+            return ipmi::responseUnspecifiedError();
+        }
+    } else {
+        return ipmi::responseUnspecifiedError();
+    }
+
+    return ipmi::responseSuccess(select);
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -395,5 +533,13 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemGetFanSpeedControl);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_FRU_MFG_DATE,
             ipmi::Privilege::User, ipmiOemSetFruMfgDate);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_I2C_MUX_MASTER,
+            ipmi::Privilege::User, ipmiOemSetI2cMuxMaster);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_I2C_MUX_MASTER,
+            ipmi::Privilege::User, ipmiOemGetI2cMuxMaster);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_UART_MUX_MASTER,
+            ipmi::Privilege::User, ipmiOemSetUartMuxMaster);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_UART_MUX_MASTER,
+            ipmi::Privilege::User, ipmiOemGetUartMuxMaster);
 }
 }
