@@ -28,12 +28,16 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <fru.hpp>
+#include <ipmid/utils.hpp>
 
 using namespace phosphor::logging;
 
 namespace ipmi
 {
 static void registerOEMFunctions() __attribute__((constructor));
+
+int sensorMergeValue(int offset, std::list<uint8_t>& valueList, double* value)
+    __attribute__((weak));
 
 ipmi::RspType<std::vector<uint8_t>> ipmiOemReadDiagLog()
 {
@@ -513,6 +517,114 @@ ipmi::RspType<uint8_t> ipmiOemGetUartMuxMaster()
     return ipmi::responseSuccess(select);
 }
 
+std::vector<std::string> getPathList(sdbusplus::bus::bus& bus, uint8_t channel)
+{
+    std::vector<std::string> path_list;
+    auto ifname = getChannelName(channel);
+    if (ifname.empty())
+    {
+        return {};
+    }
+
+    auto req = bus.new_method_call(MAPPER_BUS_NAME, MAPPER_OBJ, MAPPER_INTF,
+                                   "GetSubTree");
+    req.append(PATH_ROOT, 0, std::vector<std::string>{INTF_SENSORVAL});
+    auto reply = bus.call(req);
+    ObjectTree objs;
+    reply.read(objs);
+
+    for (const auto& [path, impls] : objs)
+    {
+        path_list.push_back(path);
+    }
+
+    return path_list;
+}
+
+int sensorMergeValue(int offset, std::list<uint8_t>& valueList, double *value)
+{
+    /* One dbus property only matches one parameter, so the size is always 1.
+     * If there is a property that needs to be combined by more than one byte,
+       we need to re-define the function in platform layer.
+     */
+    if (sensorparams[offset].size != 1) {
+        return SENSOR_CONFIG_ERROR;
+    }
+
+    *value = (double)(valueList.front());
+    valueList.pop_front();
+
+    return SENSOR_SUCCESS;
+}
+
+static int findSensorPath(int i, std::list<uint8_t>& valueList)
+{
+    double value;
+    int ret;
+    std::vector<std::string> path_list;
+    int size_count = 0;
+
+    for (struct SensorParams sensorinfo : sensorparams) {
+        size_count += sensorinfo.size;
+    }
+
+    if (size_count != valueList.size()) {
+        phosphor::logging::log<level::INFO>(
+                  "Input parameter length is not equal to configuration.");
+        return SENSOR_OUT_OF_RANGE;
+    }
+
+    sdbusplus::bus::bus bus(ipmid_get_sd_bus_connection());
+    path_list = getPathList(bus, CHANNEL_NUM);
+
+    ret = sensorMergeValue(i, valueList, &value);
+
+    if (ret)
+        return SENSOR_CONFIG_ERROR;
+
+    for (std::string path : path_list) {
+        if (sensorparams[i].path == path) {
+            setDbusProperty(bus,
+                            PATH_SERVICE,
+                            path.c_str(),
+                            INTF_SENSORVAL,
+                            "Value",
+                            value);
+        } else {
+            return SENSOR_SET_PROPERTY_ERROR;
+        }
+    }
+    return SENSOR_SUCCESS;
+}
+
+ipmi::RspType<uint8_t> ipmiOemSetExternalSensors(std::vector<uint8_t> valueVec)
+{
+    int size = sizeof(sensorparams) / sizeof(sensorparams[0]);
+
+    std::list<uint8_t> valueList(valueVec.begin(), valueVec.end());
+    for (int i=0;i<size;i++) {
+        int ret = findSensorPath(i, valueList);
+        if (ret) {
+            switch (ret) {
+                case SENSOR_OUT_OF_RANGE:
+                    phosphor::logging::log<level::INFO>(
+                        "Input parameter length is not equal to configuration.");
+                    return ipmi::responseParmOutOfRange();
+                case SENSOR_CONFIG_ERROR:
+                    phosphor::logging::log<level::INFO>(
+                        "Configuration setting error.");
+                    return ipmi::responseUnspecifiedError();
+                case SENSOR_SET_PROPERTY_ERROR:
+                    phosphor::logging::log<level::INFO>(
+                        "Cannot set dbus property suscessfully.");
+                    return ipmi::responseSensorInvalid();
+            }
+        }
+    }
+
+    return ipmi::responseSuccess();
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -541,5 +653,7 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemSetUartMuxMaster);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_UART_MUX_MASTER,
             ipmi::Privilege::User, ipmiOemGetUartMuxMaster);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_INTERNAL_SENSOR_READING,
+            ipmi::Privilege::User, ipmiOemSetExternalSensors);
 }
 }

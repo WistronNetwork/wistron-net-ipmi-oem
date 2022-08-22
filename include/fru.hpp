@@ -21,3 +21,24 @@
 
 const char* frulist[FRU_MAX] = {
 };
+
+/** @brief The dbus parameters for the interface corresponding to a channel
+ *         This helps reduce the number of mapper lookups we need for each
+ *         query and simplifies finding the VLAN interface if needed.
+ *  @example
+ *  struct SensorParams sensorparams[] = {
+ *    {.size = 2, .path = "/xyz/openbmc_project/sensors/temperature/CPU_DDR_DIMM_tmp"},
+ *    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/PHY3_temp"},
+ *  };
+ */
+struct SensorParams
+{
+    /** @brief The sensor path quantity */
+    int size;
+    /** @brief dbus path */
+    std::string path;
+};
+
+struct SensorParams sensorparams[] = {
+    NULL,
+};

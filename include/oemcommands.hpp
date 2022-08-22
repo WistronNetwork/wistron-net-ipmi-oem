@@ -17,6 +17,13 @@
 #pragma once
 
 #include <ipmid/api-types.hpp>
+#include <sdbusplus/bus.hpp>
+#include <sdbusplus/exception.hpp>
+
+#define CHANNEL_NUM 1
+#define PATH_ROOT "/xyz/openbmc_project/sensors/temperature"
+#define PATH_SERVICE "xyz.openbmc_project.ExternalSensor"
+#define INTF_SENSORVAL "xyz.openbmc_project.Sensor.Value"
 
 namespace ipmi
 {
@@ -57,6 +64,14 @@ enum wistron_oem_cmds
 enum wistron_net_oem_cmds
 {
     WIS_CMD_READ_DIAG_LOG = 0x80,
+};
+
+enum externalsensor_errtypes
+{
+    SENSOR_SUCCESS = 0x00,
+    SENSOR_OUT_OF_RANGE = 0x01,
+    SENSOR_CONFIG_ERROR = 0x02,
+    SENSOR_SET_PROPERTY_ERROR = 0x03,
 };
 
 } // namespace ipmi
