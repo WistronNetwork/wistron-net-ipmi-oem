@@ -23,3 +23,19 @@ const char* frulist[FRU_MAX] = {
     "/sys/bus/i2c/devices/8-0051/eeprom", // fru 0: bmc
     "/sys/bus/i2c/devices/3-0054/eeprom"  // fru 1: MB
 };
+
+struct SensorParams
+{
+    /** @brief The sensor path quantity */
+    int size;
+    /** @brief dbus path */
+    std::string path;
+};
+
+struct SensorParams sensorparams[] = {
+    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/MAC_Temp"},
+    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/CPU_DDR_DIMM_tmp"},
+    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/PHY1_temp"},
+    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/PHY2_temp"},
+    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/PHY3_temp"},
+};
