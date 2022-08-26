@@ -562,17 +562,6 @@ static int findSensorPath(int i, std::list<uint8_t>& valueList)
     double value;
     int ret;
     std::vector<std::string> path_list;
-    int size_count = 0;
-
-    for (struct SensorParams sensorinfo : sensorparams) {
-        size_count += sensorinfo.size;
-    }
-
-    if (size_count != valueList.size()) {
-        phosphor::logging::log<level::INFO>(
-                  "Input parameter length is not equal to configuration.");
-        return SENSOR_OUT_OF_RANGE;
-    }
 
     sdbusplus::bus::bus bus(ipmid_get_sd_bus_connection());
     path_list = getPathList(bus, CHANNEL_NUM);
@@ -590,8 +579,6 @@ static int findSensorPath(int i, std::list<uint8_t>& valueList)
                             INTF_SENSORVAL,
                             "Value",
                             value);
-        } else {
-            return SENSOR_SET_PROPERTY_ERROR;
         }
     }
     return SENSOR_SUCCESS;
@@ -600,8 +587,21 @@ static int findSensorPath(int i, std::list<uint8_t>& valueList)
 ipmi::RspType<uint8_t> ipmiOemSetExternalSensors(std::vector<uint8_t> valueVec)
 {
     int size = sizeof(sensorparams) / sizeof(sensorparams[0]);
+    int size_count = 0;
 
     std::list<uint8_t> valueList(valueVec.begin(), valueVec.end());
+
+    for (struct SensorParams sensorinfo : sensorparams) {
+        size_count += sensorinfo.size;
+    }
+
+    if (size_count != valueList.size()) {
+        syslog(LOG_ERR, "[DEBUG] size_count: %d, valueList.size(): %d", size_count, valueList.size());
+        phosphor::logging::log<level::INFO>(
+                  "Input parameter length is not equal to configuration.");
+        return ipmi::responseParmOutOfRange();
+    }
+
     for (int i=0;i<size;i++) {
         int ret = findSensorPath(i, valueList);
         if (ret) {
@@ -614,10 +614,6 @@ ipmi::RspType<uint8_t> ipmiOemSetExternalSensors(std::vector<uint8_t> valueVec)
                     phosphor::logging::log<level::INFO>(
                         "Configuration setting error.");
                     return ipmi::responseUnspecifiedError();
-                case SENSOR_SET_PROPERTY_ERROR:
-                    phosphor::logging::log<level::INFO>(
-                        "Cannot set dbus property suscessfully.");
-                    return ipmi::responseSensorInvalid();
             }
         }
     }

@@ -71,7 +71,6 @@ enum externalsensor_errtypes
     SENSOR_SUCCESS = 0x00,
     SENSOR_OUT_OF_RANGE = 0x01,
     SENSOR_CONFIG_ERROR = 0x02,
-    SENSOR_SET_PROPERTY_ERROR = 0x03,
 };
 
 } // namespace ipmi
