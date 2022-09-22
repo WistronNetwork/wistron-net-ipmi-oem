@@ -30,6 +30,10 @@
 #include <fru.hpp>
 #include <ipmid/utils.hpp>
 
+#ifndef FRU_BMC
+#define FRU_BMC 0x0
+#endif
+
 using namespace phosphor::logging;
 
 namespace ipmi
@@ -355,7 +359,12 @@ ipmi::RspType<> ipmiOemSetFruMfgDate(uint8_t fru, uint8_t lsbdate,
     if (NULL == fp) {
         return ipmi::responseUnspecifiedError();
     } else {
-        fseek (fp , 3, SEEK_SET);
+        if (fru == FRU_BMC) {
+            fseek (fp , 32 + 3, SEEK_SET);
+        } else {
+            fseek (fp , 3, SEEK_SET);
+        }
+
         memset(buffer, 0, 1);
         numread = fread(buffer, 1, 1, fp);
 
@@ -363,7 +372,11 @@ ipmi::RspType<> ipmiOemSetFruMfgDate(uint8_t fru, uint8_t lsbdate,
             fclose(fp);
             return ipmi::responseUnspecifiedError();
         }
-        date_offset = buffer[0] * 8 + 3;
+        if (fru == FRU_BMC) {
+            date_offset = buffer[0] * 8 + 32 + 3;
+        } else {
+            date_offset = buffer[0] * 8 + 3;
+        }
 
         fseek (fp , date_offset, SEEK_SET);
         buffer[0] = lsbdate;
