@@ -40,7 +40,7 @@ namespace ipmi
 {
 static void registerOEMFunctions() __attribute__((constructor));
 
-int sensorMergeValue(int offset, std::list<uint8_t>& valueList, double* value)
+void sensorMergeValue(std::list<uint8_t>& valueList, double* value)
     __attribute__((weak));
 
 ipmi::RspType<std::vector<uint8_t>> ipmiOemReadDiagLog()
@@ -554,35 +554,30 @@ std::vector<std::string> getPathList(sdbusplus::bus::bus& bus, uint8_t channel)
     return path_list;
 }
 
-int sensorMergeValue(int offset, std::list<uint8_t>& valueList, double *value)
+void sensorMergeValue(std::list<uint8_t>& valueList, double *value)
 {
     /* One dbus property only matches one parameter, so the size is always 1.
      * If there is a property that needs to be combined by more than one byte,
        we need to re-define the function in platform layer.
      */
-    if (sensorparams[offset].size != 1) {
-        return SENSOR_CONFIG_ERROR;
-    }
 
     *value = (double)(valueList.front());
     valueList.pop_front();
-
-    return SENSOR_SUCCESS;
 }
 
 static int findSensorPath(int i, std::list<uint8_t>& valueList)
 {
     double value;
-    int ret;
     std::vector<std::string> path_list;
 
     sdbusplus::bus::bus bus(ipmid_get_sd_bus_connection());
     path_list = getPathList(bus, CHANNEL_NUM);
 
-    ret = sensorMergeValue(i, valueList, &value);
-
-    if (ret)
+    if (sensorparams[i].size != 1) {
         return SENSOR_CONFIG_ERROR;
+    }
+
+    sensorMergeValue(valueList, &value);
 
     for (std::string path : path_list) {
         if (sensorparams[i].path == path) {
@@ -600,7 +595,7 @@ static int findSensorPath(int i, std::list<uint8_t>& valueList)
 ipmi::RspType<uint8_t> ipmiOemSetExternalSensors(std::vector<uint8_t> valueVec)
 {
     int size = sizeof(sensorparams) / sizeof(sensorparams[0]);
-    int size_count = 0;
+    unsigned int size_count = 0;
 
     std::list<uint8_t> valueList(valueVec.begin(), valueVec.end());
 

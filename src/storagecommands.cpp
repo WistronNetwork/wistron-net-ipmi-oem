@@ -147,7 +147,6 @@ ipmi_ret_t replaceCacheFru(uint8_t devId)
         uint8_t fruID = std::get<int>(fruidFind->second);
         uint8_t fruBus = std::get<uint32_t>(busFind->second);
         uint8_t fruAddr = std::get<uint32_t>(addrFind->second);
-        uint8_t fruHash = 0;
         std::pair<uint8_t, uint8_t> newDev(fruBus, fruAddr);
 
         deviceHashes.emplace(fruID, newDev);
