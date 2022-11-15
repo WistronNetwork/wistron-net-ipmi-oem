@@ -108,39 +108,53 @@ ipmi::RspType<> ipmiOemSetGPIO(uint8_t num, uint8_t direction, uint8_t level)
     gpio_desc_t *gdesc = NULL;
     gpio_direction_t dir;
     gpio_value_t value;
+    char shadow[10];
+
+    // export gpio if it is not occupied by another process.
+    snprintf(shadow, 10, "GPIO%d", num);
+    if (gpio_export_by_offset("aspeed-gpio", num, shadow)) {
+        return ipmi::responseDestinationUnavailable();
+    }
 
     // open gpio
     gdesc = gpio_open_by_offset("aspeed-gpio", num);
     if (gdesc == NULL) {
-		return ipmi::responseUnspecifiedError();
+        gpio_unexport(shadow);
+        return ipmi::responseUnspecifiedError();
     }
 
     // check whether direction is available
     dir = gpio_direction_str_to_type(direction ? "out" : "in");
-	if (dir == GPIO_DIRECTION_INVALID) {
-		phosphor::logging::log<level::ERR>("invalid direction:",
-			                               entry("offset: %d", num));
-		gpio_close(gdesc);
-	    return ipmi::responseUnspecifiedError();
-	}
+    if (dir == GPIO_DIRECTION_INVALID) {
+        phosphor::logging::log<level::ERR>("invalid direction:",
+                                           entry("offset: %d", num));
+        gpio_unexport(shadow);
+        gpio_close(gdesc);
+        return ipmi::responseUnspecifiedError();
+    }
 
     // set direction
     if (gpio_set_direction(gdesc, dir) != 0) {
-		phosphor::logging::log<level::ERR>("failed to set gpio direction:",
-			                               entry("offset: %d", num));
-		gpio_close(gdesc);
-	    return ipmi::responseUnspecifiedError();
-	}
+        phosphor::logging::log<level::ERR>("failed to set gpio direction:",
+                                           entry("offset: %d", num));
+        gpio_unexport(shadow);
+        gpio_close(gdesc);
+        return ipmi::responseUnspecifiedError();
+    }
 
-    // set value
-	value = (level ? GPIO_VALUE_HIGH : GPIO_VALUE_LOW);
-	if (gpio_set_value(gdesc, value) != 0) {
-		phosphor::logging::log<level::ERR>("failed to set gpio value:",
-			                                entry("offset: %d", num));
-		gpio_close(gdesc);
-	    return ipmi::responseUnspecifiedError();
-	}
+    if (direction) {
+        // set value
+        value = (level ? GPIO_VALUE_HIGH : GPIO_VALUE_LOW);
+        if (gpio_set_value(gdesc, value) != 0) {
+            phosphor::logging::log<level::ERR>("failed to set gpio value:",
+                                                entry("offset: %d", num));
+            gpio_unexport(shadow);
+            gpio_close(gdesc);
+            return ipmi::responseUnspecifiedError();
+        }
+    }
 
+    gpio_unexport(shadow);
     gpio_close(gdesc);
     return ipmi::responseSuccess();
 }
@@ -151,18 +165,28 @@ ipmi::RspType<uint8_t, uint8_t> ipmiOemGetGPIO(uint8_t num)
     gpio_direction_t dir;
     gpio_value_t value;
     uint8_t direction;
+    char shadow[10];
+
+    // export gpio if it is not occupied by another process.
+    snprintf(shadow, 10, "GPIO%d", num);
+    if (gpio_export_by_offset("aspeed-gpio", num, shadow)) {
+        return ipmi::responseDestinationUnavailable();
+    }
 
     // open gpio
     gdesc = gpio_open_by_offset("aspeed-gpio", num);
-    if (gdesc == NULL)
-		return ipmi::responseUnspecifiedError();
+    if (gdesc == NULL) {
+        gpio_unexport(shadow);
+        return ipmi::responseUnspecifiedError();
+    }
 
     if (gpio_get_direction(gdesc, &dir) != 0) {
-		phosphor::logging::log<level::ERR>("failed to get gpio direction",
+        phosphor::logging::log<level::ERR>("failed to get gpio direction",
                                             entry("offset: %d", num));
-		gpio_close(gdesc);
-	    return ipmi::responseUnspecifiedError();
-	}
+        gpio_unexport(shadow);
+        gpio_close(gdesc);
+        return ipmi::responseUnspecifiedError();
+    }
 
     // get direction
     direction = (strcmp(gpio_direction_type_to_str(dir), "out") == 0)
@@ -170,12 +194,14 @@ ipmi::RspType<uint8_t, uint8_t> ipmiOemGetGPIO(uint8_t num)
 
     //get value
     if (gpio_get_value(gdesc, &value) != 0) {
-		phosphor::logging::log<level::ERR>("failed to get gpio value:",
+        phosphor::logging::log<level::ERR>("failed to get gpio value:",
                                             entry("offset: %d", num));
-		gpio_close(gdesc);
-	    return ipmi::responseUnspecifiedError();
-	}
+        gpio_unexport(shadow);
+        gpio_close(gdesc);
+        return ipmi::responseUnspecifiedError();
+    }
 
+    gpio_unexport(shadow);
     gpio_close(gdesc);
     return ipmi::responseSuccess(direction, (uint8_t)value);
 }
@@ -195,7 +221,7 @@ static void readallgpio(struct gpiod_chip *chip,
 
     iter = gpiod_line_iter_new(chip);
     if (!iter)
-		phosphor::logging::log<level::ERR>("error creating line iterator");
+        phosphor::logging::log<level::ERR>("error creating line iterator");
 
     // read each gpio port
     gpiod_foreach_line(iter, line) {
@@ -216,14 +242,14 @@ static void readallgpio(struct gpiod_chip *chip,
             gdesc = gpio_open_by_offset("aspeed-gpio", offset);
             if (gdesc == NULL) {
                 phosphor::logging::log<level::ERR>("failed to open gpio:",
-                                                    entry("offset: %d", offset));
+                                                entry("offset: %d", offset));
                 return;
             }
 
             //get value
             if (gpio_get_value(gdesc, &value) != 0) {
                 phosphor::logging::log<level::ERR>("failed to get gpio value:",
-                                                    entry("offset: %d", offset));
+                                                entry("offset: %d", offset));
                 gpio_close(gdesc);
                 return;
             }
@@ -265,7 +291,7 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetAllGPIO()
 
     chip_iter = gpiod_chip_iter_new();
     if (!chip_iter)
-		phosphor::logging::log<level::ERR>("error accessing GPIO chips");
+        phosphor::logging::log<level::ERR>("error accessing GPIO chips");
 
     gpiod_foreach_chip(chip_iter, chip)
         readallgpio(chip, result);
