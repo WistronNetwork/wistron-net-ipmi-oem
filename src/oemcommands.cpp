@@ -29,6 +29,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <fru.hpp>
 #include <ipmid/utils.hpp>
+#include <oem_types.hpp>
 
 #ifndef FRU_BMC
 #define FRU_BMC 0x0
@@ -655,6 +656,55 @@ ipmi::RspType<uint8_t> ipmiOemSetExternalSensors(std::vector<uint8_t> valueVec)
     return ipmi::responseSuccess();
 }
 
+static void sensor_transfer_int_value(double value, std::vector<uint8_t>& values)
+{
+    int32_t int_value = (int32_t)(value * 1000);
+    values.push_back(int_value >> 24 & 0xff);
+    values.push_back(int_value >> 16 & 0xff);
+    values.push_back(int_value >> 8 & 0xff);
+    values.push_back(int_value & 0xff);
+}
+
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetExternalSensors(uint8_t num)
+{
+    std::vector<uint8_t> values;
+
+    auto iter = oem_internalsensors.find(num);
+    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
+
+    if (iter == oem_internalsensors.end())
+    {
+        if (num == 0) {
+            for (auto& it : oem_internalsensors) {
+                try {
+                    auto sensorpath = it.second.sensorPath;
+                    auto service = ipmi::getService(bus, INTF_SENSORVAL, sensorpath);
+                    auto value = ipmi::getDbusProperty(bus, service, sensorpath,
+                                                       INTF_SENSORVAL, "Value");
+                    sensor_transfer_int_value(std::get<double>(value), values);
+                }
+                catch (const std::exception& e) {
+                    sensor_transfer_int_value(0, values);
+                }
+            }
+        } else
+            return ipmi::responseSensorInvalid();
+    } else {
+        try {
+            auto sensorpath = iter->second.sensorPath;
+            auto service = ipmi::getService(bus, INTF_SENSORVAL, sensorpath);
+            auto value = ipmi::getDbusProperty(bus, service, sensorpath,
+                                               INTF_SENSORVAL, "Value");
+            sensor_transfer_int_value(std::get<double>(value), values);
+        }
+        catch (const std::exception& e) {
+            sensor_transfer_int_value(0, values);
+        }
+    }
+
+    return ipmi::responseSuccess(values);
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -685,5 +735,7 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemGetUartMuxMaster);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_INTERNAL_SENSOR_READING,
             ipmi::Privilege::User, ipmiOemSetExternalSensors);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_INTERNAL_SENSOR_READING,
+            ipmi::Privilege::User, ipmiOemGetExternalSensors);
 }
 }

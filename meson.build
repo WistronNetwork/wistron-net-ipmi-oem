@@ -35,6 +35,9 @@ endif
 
 root_inc = include_directories('.', 'include')
 
+generated_src = []
+subdir('scripts')
+
 # Dependencies
 sdbusplus_dep = dependency('sdbusplus')
 phosphor_dbus_interfaces_dep = dependency('phosphor-dbus-interfaces')
@@ -66,6 +69,8 @@ zwistronoemcmds_lib = library(
   'zwistronoemcmds',
   'src/oemcommands.cpp',
   'src/storagecommands.cpp',
+  'include/oem_types.hpp',
+  generated_src,
   platform_oemcommands_src,
   implicit_include_directories: false,
   dependencies: zwistronoemcmds_pre,
