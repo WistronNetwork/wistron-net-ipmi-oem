@@ -24,7 +24,7 @@ IdInfoMap_oem oem_internalsensors = {
         sensor = sensorDict[key]
         path = sensor["path"]
 %>
-    % if 'PSU' not in path:
+    % if '/PSU' not in path:
         <%
             count = count + 1
         %>
