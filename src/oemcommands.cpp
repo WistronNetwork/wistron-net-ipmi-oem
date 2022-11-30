@@ -568,7 +568,7 @@ void sensorMergeValue(std::list<uint8_t>& valueList, double *value)
     valueList.pop_front();
 }
 
-ipmi::RspType<uint8_t> ipmiOemSetExternalSensors(uint8_t num, std::vector<uint8_t> valueVec)
+ipmi::RspType<uint8_t> ipmiOemSetInternalSensors(uint8_t num, std::vector<uint8_t> valueVec)
 {
     auto iter = oem_externalsensors.find(num);
     std::list<uint8_t> valueList(valueVec.begin(), valueVec.end());
@@ -630,7 +630,7 @@ static void sensor_transfer_int_value(double value, std::vector<uint8_t>& values
     values.push_back(int_value & 0xff);
 }
 
-ipmi::RspType<std::vector<uint8_t>> ipmiOemGetExternalSensors(uint8_t num)
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetInternalSensors(uint8_t num)
 {
     std::vector<uint8_t> values;
 
@@ -699,8 +699,8 @@ void registerOEMFunctions()
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_UART_MUX_MASTER,
             ipmi::Privilege::User, ipmiOemGetUartMuxMaster);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_INTERNAL_SENSOR_READING,
-            ipmi::Privilege::User, ipmiOemSetExternalSensors);
+            ipmi::Privilege::User, ipmiOemSetInternalSensors);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_INTERNAL_SENSOR_READING,
-            ipmi::Privilege::User, ipmiOemGetExternalSensors);
+            ipmi::Privilege::User, ipmiOemGetInternalSensors);
 }
 }
