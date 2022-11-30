@@ -630,6 +630,14 @@ static void sensor_transfer_int_value(double value, std::vector<uint8_t>& values
     values.push_back(int_value & 0xff);
 }
 
+static void sensor_transfer_int_value_disable(std::vector<uint8_t>& values)
+{
+    values.push_back(0x7f);
+    values.push_back(0xff);
+    values.push_back(0xff);
+    values.push_back(0xff);
+}
+
 ipmi::RspType<std::vector<uint8_t>> ipmiOemGetInternalSensors(uint8_t num)
 {
     std::vector<uint8_t> values;
@@ -649,7 +657,7 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetInternalSensors(uint8_t num)
                     sensor_transfer_int_value(std::get<double>(value), values);
                 }
                 catch (const std::exception& e) {
-                    sensor_transfer_int_value(0, values);
+                    sensor_transfer_int_value_disable(values);
                 }
             }
         } else
@@ -663,7 +671,7 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetInternalSensors(uint8_t num)
             sensor_transfer_int_value(std::get<double>(value), values);
         }
         catch (const std::exception& e) {
-            sensor_transfer_int_value(0, values);
+            sensor_transfer_int_value_disable(values);
         }
     }
 
