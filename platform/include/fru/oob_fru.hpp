@@ -27,15 +27,17 @@ const char* frulist[FRU_MAX] = {
 struct SensorParams
 {
     /** @brief The sensor path quantity */
-    int size;
+    uint8_t size;
     /** @brief dbus path */
     std::string path;
 };
 
-struct SensorParams sensorparams[] = {
-    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/MAC_Temp"},
-    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/CPU_DDR_DIMM_tmp"},
-    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/PHY1_temp"},
-    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/PHY2_temp"},
-    {.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/PHY3_temp"},
+using IdInfoMap_External_Sensor = std::map<uint8_t, SensorParams>;
+
+IdInfoMap_External_Sensor oem_externalsensors = {
+    {1,{.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/MAC_Temp"}},
+    {2,{.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/CPU_DDR_DIMM_tmp"}},
+    {3,{.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/PHY1_temp"}},
+    {4,{.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/PHY2_temp"}},
+    {5,{.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/PHY3_temp"}},
 };

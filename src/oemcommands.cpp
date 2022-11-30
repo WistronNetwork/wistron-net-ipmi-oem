@@ -557,30 +557,6 @@ ipmi::RspType<uint8_t> ipmiOemGetUartMuxMaster()
     return ipmi::responseSuccess(select);
 }
 
-std::vector<std::string> getPathList(sdbusplus::bus::bus& bus, uint8_t channel)
-{
-    std::vector<std::string> path_list;
-    auto ifname = getChannelName(channel);
-    if (ifname.empty())
-    {
-        return {};
-    }
-
-    auto req = bus.new_method_call(MAPPER_BUS_NAME, MAPPER_OBJ, MAPPER_INTF,
-                                   "GetSubTree");
-    req.append(PATH_ROOT, 0, std::vector<std::string>{INTF_SENSORVAL});
-    auto reply = bus.call(req);
-    ObjectTree objs;
-    reply.read(objs);
-
-    for (const auto& [path, impls] : objs)
-    {
-        path_list.push_back(path);
-    }
-
-    return path_list;
-}
-
 void sensorMergeValue(std::list<uint8_t>& valueList, double *value)
 {
     /* One dbus property only matches one parameter, so the size is always 1.
@@ -592,65 +568,54 @@ void sensorMergeValue(std::list<uint8_t>& valueList, double *value)
     valueList.pop_front();
 }
 
-static int findSensorPath(int i, std::list<uint8_t>& valueList)
+ipmi::RspType<uint8_t> ipmiOemSetExternalSensors(uint8_t num, std::vector<uint8_t> valueVec)
 {
+    auto iter = oem_externalsensors.find(num);
+    std::list<uint8_t> valueList(valueVec.begin(), valueVec.end());
+    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
     double value;
-    std::vector<std::string> path_list;
-
-    sdbusplus::bus::bus bus(ipmid_get_sd_bus_connection());
-    path_list = getPathList(bus, CHANNEL_NUM);
-
-    if (sensorparams[i].size != 1) {
-        return SENSOR_CONFIG_ERROR;
-    }
-
-    sensorMergeValue(valueList, &value);
-
-    for (std::string path : path_list) {
-        if (sensorparams[i].path == path) {
-            setDbusProperty(bus,
-                            PATH_SERVICE,
-                            path.c_str(),
-                            INTF_SENSORVAL,
-                            "Value",
-                            value);
-        }
-    }
-    return SENSOR_SUCCESS;
-}
-
-ipmi::RspType<uint8_t> ipmiOemSetExternalSensors(std::vector<uint8_t> valueVec)
-{
-    int size = sizeof(sensorparams) / sizeof(sensorparams[0]);
     unsigned int size_count = 0;
 
-    std::list<uint8_t> valueList(valueVec.begin(), valueVec.end());
-
-    for (struct SensorParams sensorinfo : sensorparams) {
-        size_count += sensorinfo.size;
-    }
-
-    if (size_count != valueList.size()) {
-        syslog(LOG_ERR, "[DEBUG] size_count: %d, valueList.size(): %d", size_count, valueList.size());
-        phosphor::logging::log<level::INFO>(
-                  "Input parameter length is not equal to configuration.");
-        return ipmi::responseParmOutOfRange();
-    }
-
-    for (int i=0;i<size;i++) {
-        int ret = findSensorPath(i, valueList);
-        if (ret) {
-            switch (ret) {
-                case SENSOR_OUT_OF_RANGE:
-                    phosphor::logging::log<level::INFO>(
-                        "Input parameter length is not equal to configuration.");
-                    return ipmi::responseParmOutOfRange();
-                case SENSOR_CONFIG_ERROR:
-                    phosphor::logging::log<level::INFO>(
-                        "Configuration setting error.");
-                    return ipmi::responseUnspecifiedError();
+    if (iter == oem_externalsensors.end()) {
+        if (num == 0) {
+            for (auto& it : oem_externalsensors) {
+                size_count += it.second.size;
             }
+
+            if (size_count != valueList.size()) {
+                syslog(LOG_ERR, "size_count: %d, valueList.size(): %d",
+                        size_count, valueList.size());
+                phosphor::logging::log<level::INFO>(
+                    "Input parameter length is not equal to configuration.");
+                return ipmi::responseParmOutOfRange();
+            }
+
+            for (auto& it : oem_externalsensors) {
+                auto sensorpath = it.second.path;
+                auto service = ipmi::getService(bus, INTF_SENSORVAL, sensorpath);
+
+                sensorMergeValue(valueList, &value);
+                ipmi::setDbusProperty(bus, PATH_SERVICE, sensorpath,
+                                      INTF_SENSORVAL, "Value", value);
+            }
+        } else
+            return ipmi::responseSensorInvalid();
+    } else {
+        auto sensorsize = iter->second.size;
+        auto sensorpath = iter->second.path;
+        auto service = ipmi::getService(bus, INTF_SENSORVAL, sensorpath);
+
+        if (sensorsize != valueList.size()) {
+            syslog(LOG_ERR, "sensorsize: %d, valueList.size(): %d",
+                    sensorsize, valueList.size());
+            phosphor::logging::log<level::INFO>(
+                "Input parameter length is not equal to configuration.");
+            return ipmi::responseParmOutOfRange();
         }
+
+        sensorMergeValue(valueList, &value);
+        ipmi::setDbusProperty(bus, PATH_SERVICE, sensorpath, INTF_SENSORVAL,
+                                "Value", value);
     }
 
     return ipmi::responseSuccess();
