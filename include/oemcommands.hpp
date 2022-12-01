@@ -25,6 +25,7 @@
 #define PATH_ROOT "/xyz/openbmc_project/sensors/temperature"
 #define PATH_SERVICE "xyz.openbmc_project.ExternalSensor"
 #define INTF_SENSORVAL "xyz.openbmc_project.Sensor.Value"
+#define INTF_THRESH(type) "xyz.openbmc_project.Sensor.Threshold."#type
 
 namespace ipmi
 {
@@ -34,6 +35,16 @@ enum externalsensor_errtypes
     SENSOR_SUCCESS = 0x00,
     SENSOR_OUT_OF_RANGE = 0x01,
     SENSOR_CONFIG_ERROR = 0x02,
+};
+
+enum threshold_type
+{
+    LowerNonCritical = 1,
+    LowerCritical,
+    LowerNonRecoverable,
+    UpperNonCritical,
+    UpperCritical,
+    UpperNonRecoverable
 };
 
 } // namespace ipmi

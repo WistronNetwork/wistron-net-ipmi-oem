@@ -685,6 +685,65 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetInternalSensors(uint8_t num)
     return ipmi::responseSuccess(values);
 }
 
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetInternalSensorsThreshold(
+                                    uint8_t num, uint8_t threshold_type)
+{
+    std::vector<uint8_t> values;
+    std::vector<std::string> threshold;
+
+    auto iter = oem_internalsensors.find(num);
+    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
+
+    switch (threshold_type) {
+        case LowerNonCritical:
+            threshold.push_back(INTF_THRESH(Warning));
+            threshold.push_back("WarningLow");
+            break;
+        case LowerCritical:
+            threshold.push_back(INTF_THRESH(Critical));
+            threshold.push_back("CriticalLow");
+            break;
+        case LowerNonRecoverable: // Not supported
+            threshold.push_back("");
+            threshold.push_back("");
+            break;
+        case UpperNonCritical:
+            threshold.push_back(INTF_THRESH(Warning));
+            threshold.push_back("WarningHigh");
+            break;
+        case UpperCritical:
+            threshold.push_back(INTF_THRESH(Critical));
+            threshold.push_back("CriticalHigh");
+            break;
+        case UpperNonRecoverable: // Not supported
+            threshold.push_back("");
+            threshold.push_back("");
+            break;
+        default:
+            return ipmi::responseCommandNotAvailable();
+    }
+
+    if (iter == oem_internalsensors.end()) {
+        return ipmi::responseSensorInvalid();
+    } else {
+        try {
+            auto sensorpath = iter->second.sensorPath;
+            auto service = ipmi::getService(bus, threshold[0], sensorpath);
+            auto value = ipmi::getDbusProperty(bus, service, sensorpath,
+                                               threshold[0], threshold[1]);
+            if (std::isnan(std::get<double>(value)))
+                sensor_transfer_int_value_disable(values);
+            else
+                sensor_transfer_int_value(std::get<double>(value), values);
+        }
+        catch (const std::exception& e) {
+            sensor_transfer_int_value_disable(values);
+        }
+    }
+
+    return ipmi::responseSuccess(values);
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -717,5 +776,7 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemSetInternalSensors);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_INTERNAL_SENSOR_READING,
             ipmi::Privilege::User, ipmiOemGetInternalSensors);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_INTERNAL_SENSOR_THRESHOLD_READING,
+            ipmi::Privilege::User, ipmiOemGetInternalSensorsThreshold);
 }
 }
