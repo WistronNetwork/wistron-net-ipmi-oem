@@ -85,22 +85,29 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemI2cReadWrite(uint8_t bus, uint8_t add
                                                         uint8_t rd_cnt, std::vector<uint8_t> wdata)
 {
     int dev;
+    int ret;
     char i2c_bus[20];
     uint8_t *wbuf = &wdata[0];
     sprintf(i2c_bus, "/dev/i2c-%d", bus);
 
     dev = open(i2c_bus, O_RDWR);
-    if(dev < 0) {
+    if (dev < 0) {
         std::fprintf(stderr, "%s: open() failed\n", __func__);
         return ipmi::responseUnspecifiedError();
     }
 
     uint8_t *rbuf = (uint8_t *) malloc(rd_cnt * sizeof(uint8_t));
-    i2c_rdwr_msg_transfer(dev, addr << 1, wbuf, wdata.size(), rbuf, rd_cnt);
-    std::vector<uint8_t> rdata(rbuf, rbuf + rd_cnt);
-
+    ret = i2c_rdwr_msg_transfer(dev, (addr & 0xfe), wbuf,
+                                wdata.size(), rbuf, rd_cnt);
     close(dev);
+    if (ret < 0) {
+        free(rbuf);
+        return ipmi::responseUnspecifiedError();
+    }
+
+    std::vector<uint8_t> rdata(rbuf, rbuf + rd_cnt);
     free(rbuf);
+
     return ipmi::responseSuccess(rdata);
 }
 
