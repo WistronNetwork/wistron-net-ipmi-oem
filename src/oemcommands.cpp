@@ -661,7 +661,11 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetInternalSensors(uint8_t num)
                     auto service = ipmi::getService(bus, INTF_SENSORVAL, sensorpath);
                     auto value = ipmi::getDbusProperty(bus, service, sensorpath,
                                                        INTF_SENSORVAL, "Value");
-                    sensor_transfer_int_value(std::get<double>(value), values);
+                    if (std::isnan(std::get<double>(value)))
+                        sensor_transfer_int_value_disable(values);
+                    else
+                        sensor_transfer_int_value(std::get<double>(value),
+                                                  values);
                 }
                 catch (const std::exception& e) {
                     sensor_transfer_int_value_disable(values);
@@ -675,7 +679,10 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetInternalSensors(uint8_t num)
             auto service = ipmi::getService(bus, INTF_SENSORVAL, sensorpath);
             auto value = ipmi::getDbusProperty(bus, service, sensorpath,
                                                INTF_SENSORVAL, "Value");
-            sensor_transfer_int_value(std::get<double>(value), values);
+            if (std::isnan(std::get<double>(value)))
+                sensor_transfer_int_value_disable(values);
+            else
+                sensor_transfer_int_value(std::get<double>(value), values);
         }
         catch (const std::exception& e) {
             sensor_transfer_int_value_disable(values);
