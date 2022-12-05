@@ -22,8 +22,8 @@
 #include <filesystem>
 #include <string>
 #include <phosphor-logging/log.hpp>
-#include <openbmc/obmc-i2c.h>
 #include <gpiod.h>
+#include <openbmc/obmc-i2c.h>
 #include <openbmc/libgpio.h>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -751,6 +751,111 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetInternalSensorsThreshold(
     return ipmi::responseSuccess(values);
 }
 
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUSensors(uint8_t psu,
+                                                         uint8_t num)
+{
+    std::vector<uint8_t> values;
+    std::string psu_name("PSU");
+
+    auto iter = oem_psusensors.find(num);
+    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
+
+    psu_name.append(std::to_string(psu));
+    if (iter == oem_psusensors.end())
+        return ipmi::responseSensorInvalid();
+    else {
+        try {
+            std::string sensorpath(iter->second.sensorPath);
+            if (iter->first != FAN_PWM1 && iter->first != FAN_PWM2) {
+                sensorpath.replace(sensorpath.find("PSUn"), 4, psu_name);
+                auto service = ipmi::getService(bus, INTF_SENSORVAL,
+                                                sensorpath);
+                auto value = ipmi::getDbusProperty(bus, service, sensorpath,
+                                                INTF_SENSORVAL, "Value");
+                if (std::isnan(std::get<double>(value)))
+                    sensor_transfer_int_value_disable(values);
+                else
+                    sensor_transfer_int_value(std::get<double>(value), values);
+            } else {
+                if (sensorpath == "")
+                    sensor_transfer_int_value_disable(values);
+                // TODO: else need to add function to get FAN PWM
+            }
+        }
+        catch (const std::exception& e) {
+            sensor_transfer_int_value_disable(values);
+        }
+    }
+
+    return ipmi::responseSuccess(values);
+}
+
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUSensorsThreshold(uint8_t psu,
+                                           uint8_t num, uint8_t threshold_type)
+{
+    std::vector<uint8_t> values;
+    std::vector<std::string> threshold;
+    std::string psu_name("PSU");
+
+    auto iter = oem_psusensors.find(num);
+    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
+
+    switch (threshold_type) {
+        case LowerNonCritical:
+            threshold.push_back(INTF_THRESH(Warning));
+            threshold.push_back("WarningLow");
+            break;
+        case LowerCritical:
+            threshold.push_back(INTF_THRESH(Critical));
+            threshold.push_back("CriticalLow");
+            break;
+        case LowerNonRecoverable: // Not supported
+            threshold.push_back("");
+            threshold.push_back("");
+            break;
+        case UpperNonCritical:
+            threshold.push_back(INTF_THRESH(Warning));
+            threshold.push_back("WarningHigh");
+            break;
+        case UpperCritical:
+            threshold.push_back(INTF_THRESH(Critical));
+            threshold.push_back("CriticalHigh");
+            break;
+        case UpperNonRecoverable: // Not supported
+            threshold.push_back("");
+            threshold.push_back("");
+            break;
+        default:
+            return ipmi::responseCommandNotAvailable();
+    }
+
+    psu_name.append(std::to_string(psu));
+    if (iter == oem_psusensors.end()) {
+        return ipmi::responseSensorInvalid();
+    } else {
+        try {
+            if (iter->first != 11 && iter->first != 13) {
+                std::string sensorpath(iter->second.sensorPath);
+                sensorpath.replace(sensorpath.find("PSUn"), 4, psu_name);
+                auto service = ipmi::getService(bus, threshold[0], sensorpath);
+                auto value = ipmi::getDbusProperty(bus, service, sensorpath,
+                                                threshold[0], threshold[1]);
+                if (std::isnan(std::get<double>(value)))
+                    sensor_transfer_int_value_disable(values);
+                else
+                    sensor_transfer_int_value(std::get<double>(value), values);
+            } else {
+                sensor_transfer_int_value_disable(values);
+            }
+        }
+        catch (const std::exception& e) {
+            sensor_transfer_int_value_disable(values);
+        }
+    }
+
+    return ipmi::responseSuccess(values);
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -785,5 +890,9 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemGetInternalSensors);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_INTERNAL_SENSOR_THRESHOLD_READING,
             ipmi::Privilege::User, ipmiOemGetInternalSensorsThreshold);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_PSU_SENSOR_READING,
+            ipmi::Privilege::User, ipmiOemGetPSUSensors);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_PSU_SENSOR_THRESHOLD_READING,
+            ipmi::Privilege::User, ipmiOemGetPSUSensorsThreshold);
 }
 }
