@@ -71,7 +71,7 @@ zwistronoemcmds_lib = library(
   'zwistronoemcmds',
   'src/oemcommands.cpp',
   'src/storagecommands.cpp',
-  'include/oem_types.hpp',
+  'src/psu-info.cpp',
   generated_src,
   platform_oemcommands_src,
   implicit_include_directories: false,
