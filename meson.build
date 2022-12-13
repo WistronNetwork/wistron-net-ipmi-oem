@@ -49,6 +49,7 @@ gpiod_dep = dependency('libgpiod')
 gpio_ctrl_dep = dependency('libgpio-ctrl')
 obmc_i2c_dep = dependency('libobmc-i2c')
 gpiodcxx_dep = dependency('libgpiodcxx')
+psu_dep = dependency('libpsu')
 
 zwistronoemcmds_pre = declare_dependency(
   include_directories: root_inc,
@@ -63,6 +64,7 @@ zwistronoemcmds_pre = declare_dependency(
     gpio_ctrl_dep,
     obmc_i2c_dep ,
     gpiodcxx_dep,
+    psu_dep,
   ])
 
 zwistronoemcmds_lib = library(
