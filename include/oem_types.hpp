@@ -20,6 +20,15 @@ using IdInfoMap_External_Sensor = std::map<uint8_t, SensorParams>;
 
 extern IdInfoMap_External_Sensor oem_externalsensors;
 
+struct Oem_Info
+{
+    std::string sensorPath;
+};
+
+using IdInfoMap_oem = std::map<uint8_t, Oem_Info>;
+
+extern IdInfoMap_oem oem_internalsensors;
+
 struct PsuInfo
 {
     /** @brief PSU PMBus bus and address suid, ex. 24-0059 */
@@ -40,11 +49,22 @@ using IdInfoMap_Psu = std::map<uint8_t, PsuInfo>;
 
 extern IdInfoMap_Psu psu_info;
 
-struct Oem_Info
+struct FanInfo
 {
-    std::string sensorPath;
+    /** @brief Sysfs for FAN present driver path */
+    std::string presentPath;
+    /** @brief Sysfs for FAN present attributes */
+    std::string presentAttr;
+    /** @brief Sysfs for FAN direction driver path */
+    std::string directionPath;
+    /** @brief Sysfs for FAN direction attributes */
+    std::string directionAttr;
+    /** @brief Sysfs for FAN pwm driver path */
+    std::string pwmPath;
+    /** @brief Sysfs for FAN pwm attributes */
+    std::string pwmAttr;
 };
 
-using IdInfoMap_oem = std::map<uint8_t, Oem_Info>;
+using IdInfoMap_Fan = std::map<uint8_t, FanInfo>;
 
-extern IdInfoMap_oem oem_internalsensors;
+extern IdInfoMap_Fan fan_info;
