@@ -33,6 +33,7 @@
 #include <ipmid/utils.hpp>
 #include <oem_types.hpp>
 #include <psu-info.hpp>
+#include <fan-info.hpp>
 
 #ifndef FRU_BMC
 #define FRU_BMC 0x0
@@ -995,6 +996,128 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUInformation(uint8_t psu,
     return ipmi::responseSuccess(values);
 }
 
+enum fan_info_id
+{
+    FAN_INFO = 1,
+    FAN_PWM_DUTY,
+};
+
+int getFanDirection(uint8_t fan)
+{
+    auto iter = fan_info.find(fan);
+    char path_real[PATH_MAX];
+    char path[PATH_MAX];
+    int value;
+
+    try {
+        auto directionPath = iter->second.directionPath;
+        auto directionAttr = iter->second.directionAttr;
+        if (path_realpath(directionPath.c_str(), path_real))
+            return -1;
+
+        snprintf(path, sizeof(path), "%s/%s", path_real, directionAttr.c_str());
+        if (device_read(path, &value))
+            return -1;
+
+        if (value == FAN_AFI_ACTIVE)
+            return 1;
+        else
+            return 0;
+    }
+    catch (const std::exception& e) {
+        return -1;
+    }
+}
+
+int getFanPresent(uint8_t fan)
+{
+    auto iter = fan_info.find(fan);
+    char path_real[PATH_MAX];
+    char path[PATH_MAX];
+    int value;
+
+    try {
+        auto presentPath = iter->second.presentPath;
+        auto presentAttr = iter->second.presentAttr;
+        if (path_realpath(presentPath.c_str(), path_real))
+            return -1;
+
+        snprintf(path, sizeof(path), "%s/%s", path_real, presentAttr.c_str());
+        if (device_read(path, &value))
+            return -1;
+
+        if (value == FAN_PRESENT_ACTIVE)
+            return 1;
+        else
+            return 0;
+    }
+    catch (const std::exception& e) {
+        return -1;
+    }
+}
+
+int getFanPwm(uint8_t fan)
+{
+    auto iter = fan_info.find(fan);
+    char path_real[PATH_MAX];
+    char path[PATH_MAX];
+    int value;
+
+    try {
+        auto pwmPath = iter->second.pwmPath;
+        auto pwmAttr = iter->second.pwmAttr;
+        if (path_realpath(pwmPath.c_str(), path_real))
+            return -1;
+
+        snprintf(path, sizeof(path), "%s/%s", path_real, pwmAttr.c_str());
+        if (device_read(path, &value))
+            return -1;
+
+        if (value < 0 || value > 100 )
+            return -1;
+
+    }
+    catch (const std::exception& e) {
+        return -1;
+    }
+
+    return value;
+}
+
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetFanInformation(uint8_t fan,
+                                                             uint8_t num)
+{
+    uint8_t value = 0;
+    std::vector<uint8_t> values;
+    auto iter = fan_info.find(fan);
+
+    if (iter == fan_info.end())
+        return ipmi::responseSensorInvalid();
+
+    switch (num) {
+        case FAN_INFO:
+            if (getFanPresent(fan) == PRESENT)
+                value |= PRESENT;
+
+            if (getFanDirection(fan) == FAN_AFI)
+                value |= (FAN_AFI << 1);
+
+            values.push_back(value);
+            break;
+        case FAN_PWM_DUTY:
+            value = getFanPwm(fan);
+            if (value > 100)
+                values.push_back(0xff);
+
+            values.push_back(value);
+            break;
+        default:
+            return ipmi::responseCommandNotAvailable();
+    }
+
+    return ipmi::responseSuccess(values);
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -1035,5 +1158,7 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemGetPSUSensorsThreshold);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_PSU_INFORMATION,
             ipmi::Privilege::User, ipmiOemGetPSUInformation);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_FAN_INFORMATION,
+            ipmi::Privilege::User, ipmiOemGetFanInformation);
 }
 }
