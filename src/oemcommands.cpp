@@ -884,27 +884,23 @@ int getPSUPresent(uint8_t psu)
     char path[PATH_MAX];
     int value;
 
-    if (iter == psu_info.end())
-        return -1;
-    else {
-        try {
-            auto presentPath = iter->second.presentPath;
-            if (path_realpath(presentPath.c_str(), path_real))
-                return -1;
-
-            snprintf(path, sizeof(path), "%s/%s",
-                     path_real, iter->second.presentAttr.c_str());
-            if (device_read(path, &value))
-                return -1;
-
-            if (value == PSU_PRESENT_ACTIVE)
-                return 1;
-            else
-                return 0;
-        }
-        catch (const std::exception& e) {
+    try {
+        auto presentPath = iter->second.presentPath;
+        if (path_realpath(presentPath.c_str(), path_real))
             return -1;
-        }
+
+        snprintf(path, sizeof(path), "%s/%s",
+                    path_real, iter->second.presentAttr.c_str());
+        if (device_read(path, &value))
+            return -1;
+
+        if (value == PSU_PRESENT_ACTIVE)
+            return 1;
+        else
+            return 0;
+    }
+    catch (const std::exception& e) {
+        return -1;
     }
 }
 
@@ -915,27 +911,23 @@ int getPSUPowerGood(uint8_t psu)
     char path[PATH_MAX];
     int value;
 
-    if (iter == psu_info.end())
-        return -1;
-    else {
-        try {
-            auto pwrgdPath = iter->second.pwrgdPath;
-            if (path_realpath(pwrgdPath.c_str(), path_real))
-                return -1;
-
-            snprintf(path, sizeof(path), "%s/%s",
-                     path_real, iter->second.pwrgdAttr.c_str());
-            if (device_read(path, &value))
-                return -1;
-
-            if (value == PSU_PWROK_ACTIVE)
-                return 1;
-            else
-                return 0;
-        }
-        catch (const std::exception& e) {
+    try {
+        auto pwrgdPath = iter->second.pwrgdPath;
+        if (path_realpath(pwrgdPath.c_str(), path_real))
             return -1;
-        }
+
+        snprintf(path, sizeof(path), "%s/%s",
+                    path_real, iter->second.pwrgdAttr.c_str());
+        if (device_read(path, &value))
+            return -1;
+
+        if (value == PSU_PWROK_ACTIVE)
+            return 1;
+        else
+            return 0;
+    }
+    catch (const std::exception& e) {
+        return -1;
     }
 }
 
@@ -945,18 +937,14 @@ std::vector<uint8_t> getPSUMfrData(uint8_t psu, uint8_t reg, uint8_t length)
     char data[PMBUS_BLOCK_MAX] = {0};
     std::vector<uint8_t> mfr_rev;
 
-    if (iter == psu_info.end())
-        return mfr_rev;
-    else {
-        try {
-            auto pmbusSuid = iter->second.pmbusSuid;
+    try {
+        auto pmbusSuid = iter->second.pmbusSuid;
 
-            if (psu_block_read(pmbusSuid.c_str(), reg, length, data))
-                memset(data, 0, sizeof(data));
-        }
-        catch (const std::exception& e) {
+        if (psu_block_read(pmbusSuid.c_str(), reg, length, data))
             memset(data, 0, sizeof(data));
-        }
+    }
+    catch (const std::exception& e) {
+        memset(data, 0, sizeof(data));
     }
 
     for (int i = 0; i < PMBUS_BLOCK_MAX; i++)
@@ -970,6 +958,10 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUInformation(uint8_t psu,
 {
     uint8_t info = 0;
     std::vector<uint8_t> values;
+    auto iter = psu_info.find(psu);
+
+    if (iter == psu_info.end())
+        return ipmi::responseSensorInvalid();
 
     switch (num) {
         case PSU_INFO:
@@ -977,7 +969,7 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUInformation(uint8_t psu,
                 info |= FAN_AFI;
 
             if (getPSUPresent(psu) == PRESENT)
-                info |= (POWER_OK << 1);
+                info |= (PRESENT << 1);
 
             if (getPSUPowerGood(psu) == POWER_OK)
                 info |= (POWER_OK << 2);
