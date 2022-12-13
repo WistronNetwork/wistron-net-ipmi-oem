@@ -25,11 +25,14 @@
 #include <gpiod.h>
 #include <openbmc/obmc-i2c.h>
 #include <openbmc/libgpio.h>
+#include <openbmc/misc-utils.h>
+#include <openbmc/psu.h>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <fru.hpp>
 #include <ipmid/utils.hpp>
 #include <oem_types.hpp>
+#include <psu-info.hpp>
 
 #ifndef FRU_BMC
 #define FRU_BMC 0x0
@@ -43,6 +46,8 @@ static void registerOEMFunctions() __attribute__((constructor));
 
 void sensorMergeValue(std::list<uint8_t>& valueList, double* value)
     __attribute__((weak));
+
+int getPSUFanDirection(uint8_t psu) __attribute__((weak));
 
 ipmi::RspType<std::vector<uint8_t>> ipmiOemReadDiagLog()
 {
@@ -834,7 +839,7 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUSensorsThreshold(uint8_t psu,
         return ipmi::responseSensorInvalid();
     } else {
         try {
-            if (iter->first != 11 && iter->first != 13) {
+            if (iter->first != FAN_PWM1 && iter->first != FAN_PWM2) {
                 std::string sensorpath(iter->second.sensorPath);
                 sensorpath.replace(sensorpath.find("PSUn"), 4, psu_name);
                 auto service = ipmi::getService(bus, threshold[0], sensorpath);
@@ -851,6 +856,148 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUSensorsThreshold(uint8_t psu,
         catch (const std::exception& e) {
             sensor_transfer_int_value_disable(values);
         }
+    }
+
+    return ipmi::responseSuccess(values);
+}
+
+enum psu_info_id
+{
+    PSU_INFO = 1,
+    PSU_MFR_REV,
+    PSU_MFR_ID,
+    PSU_MFR_MODEL,
+    PSU_MFR_SERIAL,
+};
+
+#define PMBUS_BLOCK_MAX 32
+
+int getPSUFanDirection(uint8_t)
+{
+    return -1;
+}
+
+int getPSUPresent(uint8_t psu)
+{
+    auto iter = psu_info.find(psu);
+    char path_real[PATH_MAX];
+    char path[PATH_MAX];
+    int value;
+
+    if (iter == psu_info.end())
+        return -1;
+    else {
+        try {
+            auto presentPath = iter->second.presentPath;
+            if (path_realpath(presentPath.c_str(), path_real))
+                return -1;
+
+            snprintf(path, sizeof(path), "%s/%s",
+                     path_real, iter->second.presentAttr.c_str());
+            if (device_read(path, &value))
+                return -1;
+
+            if (value == PSU_PRESENT_ACTIVE)
+                return 1;
+            else
+                return 0;
+        }
+        catch (const std::exception& e) {
+            return -1;
+        }
+    }
+}
+
+int getPSUPowerGood(uint8_t psu)
+{
+    auto iter = psu_info.find(psu);
+    char path_real[PATH_MAX];
+    char path[PATH_MAX];
+    int value;
+
+    if (iter == psu_info.end())
+        return -1;
+    else {
+        try {
+            auto pwrgdPath = iter->second.pwrgdPath;
+            if (path_realpath(pwrgdPath.c_str(), path_real))
+                return -1;
+
+            snprintf(path, sizeof(path), "%s/%s",
+                     path_real, iter->second.pwrgdAttr.c_str());
+            if (device_read(path, &value))
+                return -1;
+
+            if (value == PSU_PWROK_ACTIVE)
+                return 1;
+            else
+                return 0;
+        }
+        catch (const std::exception& e) {
+            return -1;
+        }
+    }
+}
+
+std::vector<uint8_t> getPSUMfrData(uint8_t psu, uint8_t reg, uint8_t length)
+{
+    auto iter = psu_info.find(psu);
+    char data[PMBUS_BLOCK_MAX] = {0};
+    std::vector<uint8_t> mfr_rev;
+
+    if (iter == psu_info.end())
+        return mfr_rev;
+    else {
+        try {
+            auto pmbusSuid = iter->second.pmbusSuid;
+
+            if (psu_block_read(pmbusSuid.c_str(), reg, length, data))
+                memset(data, 0, sizeof(data));
+        }
+        catch (const std::exception& e) {
+            memset(data, 0, sizeof(data));
+        }
+    }
+
+    for (int i = 0; i < PMBUS_BLOCK_MAX; i++)
+        mfr_rev.push_back(data[i]);
+
+    return mfr_rev;
+}
+
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUInformation(uint8_t psu,
+                                                             uint8_t num)
+{
+    uint8_t info = 0;
+    std::vector<uint8_t> values;
+
+    switch (num) {
+        case PSU_INFO:
+            if (getPSUFanDirection(psu) == FAN_AFI)
+                info |= FAN_AFI;
+
+            if (getPSUPresent(psu) == PRESENT)
+                info |= (POWER_OK << 1);
+
+            if (getPSUPowerGood(psu) == POWER_OK)
+                info |= (POWER_OK << 2);
+
+            values.push_back(info);
+            break;
+        case PSU_MFR_REV:
+            values = getPSUMfrData(psu, PMBUS_MFR_REVISION, PSU_MFR_REV_LENGTH);
+            break;
+        case PSU_MFR_ID:
+            values = getPSUMfrData(psu, PMBUS_MFR_ID, PSU_MFR_ID_LENGTH);
+            break;
+        case PSU_MFR_MODEL:
+            values = getPSUMfrData(psu, PMBUS_MFR_MODEL, PSU_MFR_MODEL_LENGTH);
+            break;
+        case PSU_MFR_SERIAL:
+            values = getPSUMfrData(psu, PMBUS_MFR_SERIAL, PSU_MFR_SERIAL_LENGTH);
+            break;
+        default:
+            return ipmi::responseCommandNotAvailable();
     }
 
     return ipmi::responseSuccess(values);
@@ -894,5 +1041,7 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemGetPSUSensors);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_PSU_SENSOR_THRESHOLD_READING,
             ipmi::Privilege::User, ipmiOemGetPSUSensorsThreshold);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_PSU_INFORMATION,
+            ipmi::Privilege::User, ipmiOemGetPSUInformation);
 }
 }

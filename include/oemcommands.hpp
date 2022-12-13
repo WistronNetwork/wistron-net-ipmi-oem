@@ -20,7 +20,6 @@
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/exception.hpp>
 #include <oem_platform.hpp>
-#include <fru.hpp>
 #include <oem_types.hpp>
 
 #define CHANNEL_NUM 1
@@ -31,13 +30,6 @@
 
 namespace ipmi
 {
-
-enum externalsensor_errtypes
-{
-    SENSOR_SUCCESS = 0x00,
-    SENSOR_OUT_OF_RANGE = 0x01,
-    SENSOR_CONFIG_ERROR = 0x02,
-};
 
 enum threshold_type
 {
@@ -64,6 +56,24 @@ enum psu_num
     FAN_PWM1 = 11,
     FAN_TACH2 = 12,
     FAN_PWM2 = 13,
+};
+
+enum fan_direction
+{
+    FAN_AFO = 0,
+    FAN_AFI = 1,
+};
+
+enum device_present
+{
+    PRESENT = 1,
+    NOT_PRESENT = 0,
+};
+
+enum device_power_good
+{
+    POWER_OK = 1,
+    POWER_FAIL = 0,
 };
 
 #ifndef PSUn_FAN_PWM1
