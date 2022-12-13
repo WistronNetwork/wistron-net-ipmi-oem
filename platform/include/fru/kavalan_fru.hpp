@@ -17,6 +17,7 @@
 #pragma once
 
 #include <ipmid/api-types.hpp>
+#include <oem_types.hpp>
 
 #define FRU_MAX 9
 
@@ -31,21 +32,6 @@ const char* frulist[FRU_MAX] = {
     "/sys/bus/i2c/devices/36-0053/eeprom", // fru 7: FAN6
     "/sys/bus/i2c/devices/36-0051/eeprom"  // fru 8: FAN7
 };
-
-/*
- *  This struct is for external sensor.
- *  If there is no external sensor in the project, please keep struct empty.
- */
-struct SensorParams
-{
-    /** @brief The sensor path quantity */
-    uint8_t size;
-    /** @brief dbus path */
-    std::string path;
-};
-
-
-using IdInfoMap_External_Sensor = std::map<uint8_t, SensorParams>;
 
 IdInfoMap_External_Sensor oem_externalsensors = {
     {1,{.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/CPU_TMP"}},

@@ -17,22 +17,14 @@
 #pragma once
 
 #include <ipmid/api-types.hpp>
+#include <oem_types.hpp>
+
 #define FRU_MAX 2
 
 const char* frulist[FRU_MAX] = {
     "/sys/bus/i2c/devices/8-0051/eeprom", // fru 0: bmc
     "/sys/bus/i2c/devices/3-0054/eeprom"  // fru 1: MB
 };
-
-struct SensorParams
-{
-    /** @brief The sensor path quantity */
-    uint8_t size;
-    /** @brief dbus path */
-    std::string path;
-};
-
-using IdInfoMap_External_Sensor = std::map<uint8_t, SensorParams>;
 
 IdInfoMap_External_Sensor oem_externalsensors = {
     {1,{.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/MAC_Temp"}},

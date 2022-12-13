@@ -17,20 +17,11 @@
 #pragma once
 
 #include <ipmid/api-types.hpp>
+#include <oem_types.hpp>
 #define FRU_MAX 0
 
 const char* frulist[FRU_MAX] = {
 };
-
-struct SensorParams
-{
-    /** @brief The sensor path quantity */
-    uint8_t size;
-    /** @brief dbus path */
-    std::string path;
-};
-
-using IdInfoMap_External_Sensor = std::map<uint8_t, SensorParams>;
 
 /** @example
  *  IdInfoMap_External_Sensor oem_externalsensors = {
