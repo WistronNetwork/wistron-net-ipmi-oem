@@ -68,3 +68,19 @@ struct FanInfo
 using IdInfoMap_Fan = std::map<uint8_t, FanInfo>;
 
 extern IdInfoMap_Fan fan_info;
+
+struct FirmwareInfo
+{
+    /** @brief Sysfs for major version driver path */
+    std::string majorPath;
+    /** @brief Sysfs for major version attributes */
+    std::string majorAttr;
+    /** @brief Sysfs for major version driver path */
+    std::string minorPath;
+    /** @brief Sysfs for major version attributes */
+    std::string minorAttr;
+};
+
+using IdInfoMap_Firmware = std::map<uint8_t, FirmwareInfo>;
+
+extern IdInfoMap_Firmware firmware_info;
