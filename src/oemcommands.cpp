@@ -1119,6 +1119,149 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetFanInformation(uint8_t fan,
     return ipmi::responseSuccess(values);
 }
 
+enum firmware_info_id
+{
+    BMC_PRIMARY_VER = 1,
+    BMC_BACKUP_VER,
+    CPLD0_VER,
+    CPLD1_VER,
+    CPLD2_VER,
+    FANCPLD_VER,
+    FPGA_VER,
+};
+
+std::vector<uint8_t> getCpldVersion(uint8_t fru)
+{
+    auto iter = firmware_info.find(fru);
+    char path_real[PATH_MAX];
+    char path[PATH_MAX];
+    std::vector<uint8_t> values;
+    int value = 0xff;
+    std::string empty ("NULL");
+
+    try {
+        auto majorPath = iter->second.majorPath;
+        auto majorAttr = iter->second.majorAttr;
+        auto minorPath = iter->second.minorPath;
+        auto minorAttr = iter->second.minorAttr;
+
+        if (majorPath.compare(empty) == 0)
+            values.push_back(0);
+        else {
+            if (path_realpath(majorPath.c_str(), path_real))
+                 value = 0xff;
+
+            snprintf(path, sizeof(path), "%s/%s", path_real, majorAttr.c_str());
+            if (device_read(path, &value))
+                 value = 0xff;
+
+            values.push_back(value);
+        }
+
+        if (minorPath.compare(empty) == 0)
+            values.push_back(0);
+        else {
+            if (path_realpath(minorPath.c_str(), path_real))
+                value = 0xff;
+
+            snprintf(path, sizeof(path), "%s/%s", path_real, minorAttr.c_str());
+            if (device_read(path, &value))
+                value = 0xff;
+
+            values.push_back(value);
+        }
+
+    }
+    catch (const std::exception& e) {
+        return values;
+    }
+
+    return values;
+}
+
+std::vector<uint8_t> getBmcVersion(uint8_t fru)
+{
+    auto iter = firmware_info.find(fru);
+    char path[PATH_MAX];
+    std::string empty ("NULL");
+    std::string versionKey ("VERSION_ID=");
+    std::string versionValue{};
+    std::ifstream releasefile;
+    std::string line;
+    std::vector<std::uint8_t> values;
+
+    try {
+        auto majorPath = iter->second.majorPath;
+        auto majorAttr = iter->second.majorAttr;
+
+        if (majorPath.compare(empty) == 0) {
+            values.push_back(0);
+            values.push_back(0);
+            values.push_back(0);
+        } else {
+            snprintf(path, sizeof(path), "%s/%s",
+                     majorPath.c_str(), majorAttr.c_str());
+
+            releasefile.open(path);
+
+            while (getline(releasefile, line))
+            {
+                if (line.substr(0, versionKey.size()).find(versionKey) !=
+                    std::string::npos)
+                {
+                    versionValue = line.substr(versionKey.size());
+                    break;
+                }
+            }
+            releasefile.close();
+
+            std::stringstream ssversion (versionValue);
+            std::string version;
+
+            while(ssversion.good())
+            {
+                std::string version;
+                getline(ssversion, version, '.');
+                values.push_back(std::stoi(version));
+            }
+        }
+    }
+    catch (const std::exception& e) {
+        values.push_back(0xff);
+        values.push_back(0xff);
+        values.push_back(0xff);
+    }
+
+    return values;
+}
+
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetFirmwareInformation(uint8_t fru)
+{
+    std::vector<uint8_t> values;
+    auto iter = firmware_info.find(fru);
+
+    if (iter == firmware_info.end())
+        return ipmi::responseCommandNotAvailable();
+
+    switch (fru) {
+        case BMC_PRIMARY_VER:
+        case BMC_BACKUP_VER:
+            values = getBmcVersion(fru);
+            break;
+        case CPLD0_VER:
+        case CPLD1_VER:
+        case CPLD2_VER:
+        case FANCPLD_VER:
+        case FPGA_VER:
+            values = getCpldVersion(fru);
+            break;
+        default:
+            return ipmi::responseCommandNotAvailable();
+    }
+
+    return ipmi::responseSuccess(values);
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -1161,5 +1304,7 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemGetPSUInformation);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_FAN_INFORMATION,
             ipmi::Privilege::User, ipmiOemGetFanInformation);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_FIRMWARE_INFO,
+            ipmi::Privilege::User, ipmiOemGetFirmwareInformation);
 }
 }
