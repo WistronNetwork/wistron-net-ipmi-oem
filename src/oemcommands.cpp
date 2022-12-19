@@ -935,20 +935,21 @@ int getPSUPowerGood(uint8_t psu)
 std::vector<uint8_t> getPSUMfrData(uint8_t psu, uint8_t reg, uint8_t length)
 {
     auto iter = psu_info.find(psu);
-    char data[PMBUS_BLOCK_MAX] = {0};
+    char data[PMBUS_BLOCK_MAX];
     std::vector<uint8_t> mfr_rev;
 
+    memset(data, 0xa, sizeof(data)); /* Init all value with LF char */
     try {
         auto pmbusSuid = iter->second.pmbusSuid;
 
         if (psu_block_read(pmbusSuid.c_str(), reg, length, data))
-            memset(data, 0, sizeof(data));
+            memset(data, 0xa, sizeof(data));
     }
     catch (const std::exception& e) {
-        memset(data, 0, sizeof(data));
+        memset(data, 0xa, sizeof(data));
     }
 
-    for (int i = 0; i < PMBUS_BLOCK_MAX; i++)
+    for (int i = 0; i < length; i++)
         mfr_rev.push_back(data[i]);
 
     return mfr_rev;
