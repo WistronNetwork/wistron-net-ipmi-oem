@@ -84,3 +84,23 @@ struct FirmwareInfo
 using IdInfoMap_Firmware = std::map<uint8_t, FirmwareInfo>;
 
 extern IdInfoMap_Firmware firmware_info;
+
+struct LEDInfo
+{
+    /** @brief Sysfs for LED status driver path */
+    std::string ledStatusPath;
+    /** @brief Sysfs for LED status attributes */
+    std::string ledStatusrAttr;
+    /** @brief Sysfs for LED control driver path */
+    std::string ledControlPath;
+    /** @brief Sysfs for LED control attributes */
+    std::string ledControlAttr;
+    /** @brief Sysfs for LED force mode driver path */
+    std::string ledForceModePath;
+    /** @brief Sysfs for LED force mode attributes */
+    std::string ledForceModeAttr;
+};
+
+using IdInfoMap_LED = std::map<uint8_t, LEDInfo>;
+
+extern IdInfoMap_LED led_info;

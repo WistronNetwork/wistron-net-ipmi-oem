@@ -74,6 +74,7 @@ zwistronoemcmds_lib = library(
   'src/psu-info.cpp',
   'src/fan-info.cpp',
   'src/firmware-info.cpp',
+  'src/led-info.cpp',
   generated_src,
   platform_oemcommands_src,
   implicit_include_directories: false,
