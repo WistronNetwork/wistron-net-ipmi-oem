@@ -1109,7 +1109,7 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetFanInformation(uint8_t fan,
         case FAN_PWM_DUTY:
             value = getFanPwm(fan);
             if (value > 100)
-                values.push_back(0xff);
+                value = 0xff;
 
             values.push_back(value);
             break;
@@ -1174,7 +1174,8 @@ std::vector<uint8_t> getCpldVersion(uint8_t fru)
 
     }
     catch (const std::exception& e) {
-        return values;
+        values.push_back(0xff);
+        values.push_back(0xff);
     }
 
     return values;
