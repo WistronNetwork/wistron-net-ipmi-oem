@@ -34,6 +34,7 @@
 #include <oem_types.hpp>
 #include <psu-info.hpp>
 #include <fan-info.hpp>
+#include <led-info.hpp>
 
 #ifndef FRU_BMC
 #define FRU_BMC 0x0
@@ -1262,6 +1263,107 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetFirmwareInformation(uint8_t fru)
     return ipmi::responseSuccess(values);
 }
 
+ipmi::RspType<uint8_t> ipmiOemSetLEDStatus(uint8_t led,
+                                           std::vector<uint8_t> valueVec)
+{
+    auto iter = led_info.find(led);
+    std::list<uint8_t> valueList(valueVec.begin(), valueVec.end());
+    char path_real[PATH_MAX];
+    char ForceModePath[PATH_MAX];
+    char ControlPath[PATH_MAX];
+    char str_value[10] = {0};
+    std::string empty ("NULL");
+
+    auto ledForceModePath = iter->second.ledForceModePath;
+    auto ledForceModeAttr = iter->second.ledForceModeAttr;
+    auto ledControlPath = iter->second.ledControlPath;
+    auto ledControlAttr = iter->second.ledControlAttr;
+
+    try {
+        if (ledControlPath.compare(empty) == 0)
+            return ipmi::responseCommandNotAvailable();
+
+        switch (valueList.size())
+        {
+            case 1: /* Byte for LED force mode */
+            case 2: /* Byte for LED control */
+                if (valueList.front() != 0 && valueList.front() != 1)
+                    return ipmi::responseParmOutOfRange();
+
+                if (path_realpath(ledForceModePath.c_str(), path_real))
+                    return ipmi::responseDestinationUnavailable();
+
+                snprintf(ForceModePath, sizeof(ForceModePath), "%s/%s",
+                            path_real, ledForceModeAttr.c_str());
+                sprintf(str_value, "%u", valueList.front());
+
+                if (device_write_buff(ForceModePath, str_value))
+                    return ipmi::responseUnspecifiedError();
+
+                if (valueList.size() == 2) {
+                    if (valueList.front() != 1 ||
+                        valueList.back() > LED_STATUS_MAX)
+                        return ipmi::responseParmOutOfRange();
+
+                    if (path_realpath(ledControlPath.c_str(), path_real))
+                        return ipmi::responseDestinationUnavailable();
+
+                    snprintf(ControlPath, sizeof(ControlPath), "%s/%s",
+                             path_real, ledControlAttr.c_str());
+                    sprintf(str_value, "%u", valueList.back());
+
+                    if (device_write_buff(ControlPath, str_value))
+                        return ipmi::responseUnspecifiedError();
+                }
+                break;
+            default:
+                return ipmi::responseParmOutOfRange();
+        }
+    }
+    catch (const std::exception& e) {
+        return ipmi::responseUnspecifiedError();
+    }
+
+    return ipmi::responseSuccess();
+}
+
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetLEDStatus(uint8_t led)
+{
+    auto iter = led_info.find(led);
+    char path_real[PATH_MAX];
+    char path[PATH_MAX];
+    int value;
+    std::vector<uint8_t> values;
+    std::string empty ("NULL");
+
+    if (iter == led_info.end())
+        return ipmi::responseCommandNotAvailable();
+
+    try {
+        auto ledStatusPath = iter->second.ledStatusPath;
+        auto ledStatusrAttr = iter->second.ledStatusrAttr;
+
+        if (ledStatusPath.compare(empty) == 0)
+            value = 0;
+        else {
+            if (path_realpath(ledStatusPath.c_str(), path_real))
+                 value = 0xff;
+
+            snprintf(path, sizeof(path), "%s/%s",
+                     path_real, ledStatusrAttr.c_str());
+            if (device_read(path, &value))
+                 value = 0xff;
+        }
+    }
+    catch (const std::exception& e) {
+        value = 0xff;
+    }
+
+    values.push_back(value);
+
+    return ipmi::responseSuccess(values);
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -1306,5 +1408,9 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemGetFanInformation);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_FIRMWARE_INFO,
             ipmi::Privilege::User, ipmiOemGetFirmwareInformation);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_LED_STATUS,
+            ipmi::Privilege::User, ipmiOemSetLEDStatus);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_LED_STATUS,
+            ipmi::Privilege::User, ipmiOemGetLEDStatus);
 }
 }
