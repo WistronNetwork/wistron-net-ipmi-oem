@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <openbmc/psu.h>
 #include <openbmc/obmc-i2c.h>
 #include <oem_types.hpp>
 
