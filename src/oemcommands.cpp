@@ -50,6 +50,10 @@ void sensorMergeValue(std::list<uint8_t>& valueList, double* value)
     __attribute__((weak));
 
 int getPSUFanDirection(uint8_t psu) __attribute__((weak));
+ipmi::RspType<uint8_t> ipmiOemSetLEDStatus(uint8_t led, std::vector<uint8_t> valueVec)
+                       __attribute__((weak));
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetLEDStatus(uint8_t led)
+                                    __attribute__((weak));
 
 ipmi::RspType<std::vector<uint8_t>> ipmiOemReadDiagLog()
 {
