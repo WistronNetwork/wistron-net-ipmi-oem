@@ -22,9 +22,6 @@
 #include <oem_platform.hpp>
 #include <oem_types.hpp>
 
-#define CHANNEL_NUM 1
-#define PATH_ROOT "/xyz/openbmc_project/sensors/temperature"
-#define PATH_SERVICE "xyz.openbmc_project.ExternalSensor"
 #define INTF_SENSORVAL "xyz.openbmc_project.Sensor.Value"
 #define INTF_THRESH(type) "xyz.openbmc_project.Sensor.Threshold."#type
 

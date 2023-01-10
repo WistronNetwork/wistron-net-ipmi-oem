@@ -593,6 +593,7 @@ ipmi::RspType<uint8_t> ipmiOemSetInternalSensors(uint8_t num, std::vector<uint8_
     sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
     double value;
     unsigned int size_count = 0;
+    auto extsensorservice = "xyz.openbmc_project.Hwmon.external";
 
     if (iter == oem_externalsensors.end()) {
         if (num == 0) {
@@ -612,9 +613,21 @@ ipmi::RspType<uint8_t> ipmiOemSetInternalSensors(uint8_t num, std::vector<uint8_
                 auto sensorpath = it.second.path;
                 auto service = ipmi::getService(bus, INTF_SENSORVAL, sensorpath);
 
+                std::string extsensorpath = sensorpath;
+                extsensorpath.replace(extsensorpath.find("/sensors/"),
+                                      9, "/extsensors/");
+
                 sensorMergeValue(valueList, &value);
-                ipmi::setDbusProperty(bus, PATH_SERVICE, sensorpath,
+                ipmi::setDbusProperty(bus, service, sensorpath,
                                       INTF_SENSORVAL, "Value", value);
+                try {
+                    ipmi::setDbusProperty(bus, extsensorservice, extsensorpath,
+                                          INTF_SENSORVAL, "Value", value);
+                } catch (const std::exception& e) {
+                    std::cerr << "Fail to set extsensor path: "
+                              << extsensorpath << "\n";
+                    return ipmi::responseSuccess();
+                }
             }
         } else
             return ipmi::responseSensorInvalid();
@@ -622,6 +635,10 @@ ipmi::RspType<uint8_t> ipmiOemSetInternalSensors(uint8_t num, std::vector<uint8_
         auto sensorsize = iter->second.size;
         auto sensorpath = iter->second.path;
         auto service = ipmi::getService(bus, INTF_SENSORVAL, sensorpath);
+
+        std::string extsensorpath = sensorpath;
+        extsensorpath.replace(extsensorpath.find("/sensors/"),
+                                9, "/extsensors/");
 
         if (sensorsize != valueList.size()) {
             syslog(LOG_ERR, "sensorsize: %d, valueList.size(): %d",
@@ -632,8 +649,16 @@ ipmi::RspType<uint8_t> ipmiOemSetInternalSensors(uint8_t num, std::vector<uint8_
         }
 
         sensorMergeValue(valueList, &value);
-        ipmi::setDbusProperty(bus, PATH_SERVICE, sensorpath, INTF_SENSORVAL,
+        ipmi::setDbusProperty(bus, service, sensorpath, INTF_SENSORVAL,
                                 "Value", value);
+        try {
+            ipmi::setDbusProperty(bus, extsensorservice, extsensorpath,
+                                  INTF_SENSORVAL, "Value", value);
+        } catch (const std::exception& e) {
+            std::cerr << "Fail to set extsensor path: "
+                      << extsensorpath << "\n";
+            return ipmi::responseSuccess();
+        }
     }
 
     return ipmi::responseSuccess();
