@@ -325,22 +325,34 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetAllGPIO()
  *
  *  @returns IPMI completion code
  */
-ipmi::RspType<> ipmiOemSetFanSpeedControl(uint8_t mode, uint8_t duty)
+ipmi::RspType<> ipmiOemSetFanSpeedControl(uint8_t mode,
+                                          std::vector<uint8_t> valueVec)
 {
     const int MAX_COMMAND = 64;
     char command[MAX_COMMAND];
+    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
+    auto fanctrlservice = "xyz.openbmc_project.State.FanCtrl";
+    auto zonepath = "/xyz/openbmc_project/settings/fanctrl/zone1";
+    auto controlmode = "xyz.openbmc_project.Control.Mode";
+    std::list<uint8_t> valueList(valueVec.begin(), valueVec.end());
+    uint8_t duty = valueList.front();
 
-    // TODO: Mode control - currently only force mode (Manually Control)
-
-    if (mode == 1) {
+    if (mode == 1 && valueList.size() == 1) {
         snprintf(command, MAX_COMMAND,
                  "/usr/local/bin/fan-util --set %d ", duty);
 
+        ipmi::setDbusProperty(bus, fanctrlservice, zonepath,
+                              controlmode, "Manual", true);
         auto ret = system(command);
         if (ret) {
             return ipmi::responseUnspecifiedError();
         }
-    }
+    } else if (mode == 0 && valueList.size() == 0) {
+        ipmi::setDbusProperty(bus, fanctrlservice, zonepath,
+                              controlmode, "Manual", false);
+    } else
+        return ipmi::responseParmOutOfRange();
+
 
     return ipmi::responseSuccess();
 }
@@ -356,13 +368,16 @@ ipmi::RspType<uint8_t, uint8_t> ipmiOemGetFanSpeedControl()
     const int MAX_BUFFER = 256;
     char buffer[MAX_BUFFER];
     uint8_t duty = 0;
-    uint8_t mode = 0;
     std::string value;
     std::vector<std::string> result;
     FILE * stream;
+    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
+    auto fanctrlservice = "xyz.openbmc_project.State.FanCtrl";
+    auto zonepath = "/xyz/openbmc_project/settings/fanctrl/zone1";
+    auto controlmode = "xyz.openbmc_project.Control.Mode";
 
-    // TODO: Mode control - currently only force mode (Manually Control)
-    mode = 1;
+    auto mode = ipmi::getDbusProperty(bus, fanctrlservice, zonepath,
+                                                       controlmode, "Manual");
 
     stream = popen("/usr/local/bin/fan-util --get", "r");
     if (stream) {
@@ -387,7 +402,7 @@ ipmi::RspType<uint8_t, uint8_t> ipmiOemGetFanSpeedControl()
         return ipmi::responseUnspecifiedError();
     }
 
-    return ipmi::responseSuccess(mode, duty);
+    return ipmi::responseSuccess(std::get<bool>(mode) ? 1 : 0, duty);
 }
 
 ipmi::RspType<> ipmiOemSetFruMfgDate(uint8_t fru, uint8_t lsbdate,
