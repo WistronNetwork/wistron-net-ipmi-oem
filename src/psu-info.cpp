@@ -17,6 +17,7 @@
 #include <openbmc/psu.h>
 #include <openbmc/obmc-i2c.h>
 #include <oem_types.hpp>
+#include <oemcommands.hpp>
 
 IdInfoMap_Psu psu_info = {
     {
@@ -29,5 +30,12 @@ IdInfoMap_Psu psu_info = {
             .pwrgdPath = "NULL",
             .pwrgdAttr = "NULL",
         }
+    },
+};
+
+IdInfoMap_oem oem_psusensors = {
+    {
+        0,
+        {.sensorPath = "",}
     },
 };

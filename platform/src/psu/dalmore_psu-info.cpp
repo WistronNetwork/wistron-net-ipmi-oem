@@ -16,6 +16,7 @@
 
 #include <openbmc/obmc-i2c.h>
 #include <oem_types.hpp>
+#include <oemcommands.hpp>
 
 #define CPLD0_PATH I2C_SYSFS_DEV_DIR(1-0066)"/hwmon"
 
@@ -41,5 +42,60 @@ IdInfoMap_Psu psu_info = {
             .pwrgdPath = CPLD0_PATH,
             .pwrgdAttr = "fm_pwrok_psu2",
         }
+    },
+};
+
+IdInfoMap_oem oem_psusensors = {
+    {
+        VIN_AC,
+        {.sensorPath = "/xyz/openbmc_project/sensors/voltage/PSUn_VIN_AC",}
+    },
+    {
+        VOUT_DC,
+        {.sensorPath = "/xyz/openbmc_project/sensors/voltage/PSUn_VOUT_DC",}
+    },
+    {
+        PIN_AC,
+        {.sensorPath = "/xyz/openbmc_project/sensors/power/PSUn_PIN_AC",}
+    },
+    {
+        POUT_DC,
+        {.sensorPath = "/xyz/openbmc_project/sensors/power/PSUn_POUT_DC",}
+    },
+    {
+        IIN_AC,
+        {.sensorPath = "/xyz/openbmc_project/sensors/current/PSUn_IIN_AC",}
+    },
+    {
+        IOUT_DC,
+        {.sensorPath = "/xyz/openbmc_project/sensors/current/PSUn_IOUT_DC",}
+    },
+    {
+        TMP,
+        {.sensorPath = "/xyz/openbmc_project/sensors/temperature/PSUn_TMP",}
+    },
+    {
+        TMP2,
+        {.sensorPath = "/xyz/openbmc_project/sensors/temperature/PSUn_TMP2",}
+    },
+    {
+        TMP3,
+        {.sensorPath = "/xyz/openbmc_project/sensors/temperature/PSUn_TMP3",}
+    },
+    {
+        FAN_TACH1,
+        {.sensorPath = "/xyz/openbmc_project/sensors/fan_tach/PSUn_FAN_TACH1",}
+    },
+    {
+        FAN_PWM1,
+        {.sensorPath = PSUn_FAN_PWM1,}
+    },
+    {
+        FAN_TACH2,
+        {.sensorPath = "/xyz/openbmc_project/sensors/fan_tach/PSUn_FAN_TACH2",}
+    },
+    {
+        FAN_PWM2,
+        {.sensorPath = PSUn_FAN_PWM2,}
     },
 };

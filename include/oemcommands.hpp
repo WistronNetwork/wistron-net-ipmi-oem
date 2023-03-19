@@ -25,9 +25,6 @@
 #define INTF_SENSORVAL "xyz.openbmc_project.Sensor.Value"
 #define INTF_THRESH(type) "xyz.openbmc_project.Sensor.Threshold."#type
 
-namespace ipmi
-{
-
 enum threshold_type
 {
     LowerNonCritical = 1,
@@ -80,60 +77,3 @@ enum device_power_good
 #ifndef PSUn_FAN_PWM2
 #define PSUn_FAN_PWM2 ""
 #endif
-
-IdInfoMap_oem oem_psusensors = {
-    {
-        VIN_AC,
-        {.sensorPath = "/xyz/openbmc_project/sensors/voltage/PSUn_VIN_AC",}
-    },
-    {
-        VOUT_DC,
-        {.sensorPath = "/xyz/openbmc_project/sensors/voltage/PSUn_VOUT_DC",}
-    },
-    {
-        PIN_AC,
-        {.sensorPath = "/xyz/openbmc_project/sensors/power/PSUn_PIN_AC",}
-    },
-    {
-        POUT_DC,
-        {.sensorPath = "/xyz/openbmc_project/sensors/power/PSUn_POUT_DC",}
-    },
-    {
-        IIN_AC,
-        {.sensorPath = "/xyz/openbmc_project/sensors/current/PSUn_IIN_AC",}
-    },
-    {
-        IOUT_DC,
-        {.sensorPath = "/xyz/openbmc_project/sensors/current/PSUn_IOUT_DC",}
-    },
-    {
-        TMP,
-        {.sensorPath = "/xyz/openbmc_project/sensors/temperature/PSUn_TMP",}
-    },
-    {
-        TMP2,
-        {.sensorPath = "/xyz/openbmc_project/sensors/temperature/PSUn_TMP2",}
-    },
-    {
-        TMP3,
-        {.sensorPath = "/xyz/openbmc_project/sensors/temperature/PSUn_TMP3",}
-    },
-    {
-        FAN_TACH1,
-        {.sensorPath = "/xyz/openbmc_project/sensors/fan_tach/PSUn_FAN_TACH1",}
-    },
-    {
-        FAN_PWM1,
-        {.sensorPath = PSUn_FAN_PWM1,}
-    },
-    {
-        FAN_TACH2,
-        {.sensorPath = "/xyz/openbmc_project/sensors/fan_tach/PSUn_FAN_TACH2",}
-    },
-    {
-        FAN_PWM2,
-        {.sensorPath = PSUn_FAN_PWM2,}
-    },
-};
-
-} // namespace ipmi

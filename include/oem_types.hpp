@@ -28,6 +28,7 @@ struct Oem_Info
 using IdInfoMap_oem = std::map<uint8_t, Oem_Info>;
 
 extern IdInfoMap_oem oem_internalsensors;
+extern IdInfoMap_oem oem_psusensors;
 
 struct PsuInfo
 {
