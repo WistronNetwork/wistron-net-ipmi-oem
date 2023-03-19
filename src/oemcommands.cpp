@@ -46,12 +46,9 @@ namespace ipmi
 {
 static void registerOEMFunctions() __attribute__((constructor));
 
-void sensorMergeValue(std::list<uint8_t>& valueList, double* value)
-    __attribute__((weak));
-
-int getPSUFanDirection(uint8_t psu) __attribute__((weak));
-ipmi::RspType<uint8_t> ipmiOemSetLEDStatus(uint8_t led, std::vector<uint8_t> valueVec)
-                       __attribute__((weak));
+ipmi::RspType<uint8_t> ipmiOemSetLEDStatus(uint8_t led,
+                                           std::vector<uint8_t> valueVec)
+                                           __attribute__((weak));
 ipmi::RspType<std::vector<uint8_t>> ipmiOemGetLEDStatus(uint8_t led)
                                     __attribute__((weak));
 
@@ -92,14 +89,20 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemReadDiagLog()
     return ipmi::responseSuccess(rsp);
 }
 
-ipmi::RspType<std::vector<uint8_t>> ipmiOemI2cReadWrite(uint8_t bus, uint8_t addr,
-                                                        uint8_t rd_cnt, std::vector<uint8_t> wdata)
+ipmi::RspType<std::vector<uint8_t>> ipmiOemI2cReadWrite(uint8_t bus,
+                                                        uint8_t addr,
+                                                        uint8_t rd_cnt,
+                                                        std::vector<uint8_t> wdata)
 {
     int dev;
     int ret;
     char i2c_bus[20];
     uint8_t *wbuf = &wdata[0];
     sprintf(i2c_bus, "/dev/i2c-%d", bus);
+    OemPlatform platform;
+
+    if (platform.getI2cMuxSel() > 0)
+        return ipmi::responseResponseError();
 
     dev = open(i2c_bus, O_RDWR);
     if (dev < 0) {
@@ -487,39 +490,16 @@ ipmi::RspType<> ipmiOemSetI2cMuxMaster(uint8_t select)
  */
 ipmi::RspType<uint8_t> ipmiOemGetI2cMuxMaster()
 {
-    const int MAX_BUFFER = 32;
-    char buffer[MAX_BUFFER];
-    uint8_t select = 0;
-    std::string value;
-    std::vector<std::string> result;
-    FILE * stream;
+    int select = 0;
+    OemPlatform platform;
 
-    stream = popen("/usr/local/bin/mux-util --get i2c", "r");
-    if (stream) {
-        while (!feof(stream)) {
-            if (fgets(buffer, MAX_BUFFER, stream) != NULL) {
-                value.append(buffer);
-            }
-        }
-
-        auto ret = pclose(stream);
-        if (ret) {
-            return ipmi::responseUnspecifiedError();
-        }
-
-        // mux-util output format is "BMC" or "CPU"
-        if (value.compare(0, 3, "BMC") == 0) {
-            select = 0;
-        } else if (value.compare(0, 3, "CPU") == 0) {
-            select = 1;
-        } else {
-            return ipmi::responseUnspecifiedError();
-        }
-    } else {
+    select = platform.getI2cMuxSel();
+    if (select == -1)
         return ipmi::responseUnspecifiedError();
-    }
+    else if (select == -2)
+        return ipmi::responseCommandNotAvailable();
 
-    return ipmi::responseSuccess(select);
+    return ipmi::responseSuccess((uint8_t)select);
 }
 
 /** @brief implements the set UART mux master select command
@@ -590,17 +570,6 @@ ipmi::RspType<uint8_t> ipmiOemGetUartMuxMaster()
     return ipmi::responseSuccess(select);
 }
 
-void sensorMergeValue(std::list<uint8_t>& valueList, double *value)
-{
-    /* One dbus property only matches one parameter, so the size is always 1.
-     * If there is a property that needs to be combined by more than one byte,
-       we need to re-define the function in platform layer.
-     */
-
-    *value = (double)(valueList.front());
-    valueList.pop_front();
-}
-
 ipmi::RspType<uint8_t> ipmiOemSetInternalSensors(uint8_t num, std::vector<uint8_t> valueVec)
 {
     auto iter = oem_externalsensors.find(num);
@@ -609,6 +578,7 @@ ipmi::RspType<uint8_t> ipmiOemSetInternalSensors(uint8_t num, std::vector<uint8_
     double value;
     unsigned int size_count = 0;
     auto extsensorservice = "xyz.openbmc_project.Hwmon.external";
+    OemPlatform platform;
 
     if (iter == oem_externalsensors.end()) {
         if (num == 0) {
@@ -632,7 +602,7 @@ ipmi::RspType<uint8_t> ipmiOemSetInternalSensors(uint8_t num, std::vector<uint8_
                 extsensorpath.replace(extsensorpath.find("/sensors/"),
                                       9, "/extsensors/");
 
-                sensorMergeValue(valueList, &value);
+                platform.sensorMergeValue(valueList, &value);
                 ipmi::setDbusProperty(bus, service, sensorpath,
                                       INTF_SENSORVAL, "Value", value);
                 try {
@@ -663,7 +633,7 @@ ipmi::RspType<uint8_t> ipmiOemSetInternalSensors(uint8_t num, std::vector<uint8_
             return ipmi::responseParmOutOfRange();
         }
 
-        sensorMergeValue(valueList, &value);
+        platform.sensorMergeValue(valueList, &value);
         ipmi::setDbusProperty(bus, service, sensorpath, INTF_SENSORVAL,
                                 "Value", value);
         try {
@@ -907,98 +877,7 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUSensorsThreshold(uint8_t psu,
     return ipmi::responseSuccess(values);
 }
 
-enum psu_info_id
-{
-    PSU_INFO = 1,
-    PSU_MFR_REV,
-    PSU_MFR_ID,
-    PSU_MFR_MODEL,
-    PSU_MFR_SERIAL,
-};
 
-#define PMBUS_BLOCK_MAX 32
-
-int getPSUFanDirection(uint8_t)
-{
-    return -1;
-}
-
-int getPSUPresent(uint8_t psu)
-{
-    auto iter = psu_info.find(psu);
-    char path_real[PATH_MAX];
-    char path[PATH_MAX];
-    int value;
-
-    try {
-        auto presentPath = iter->second.presentPath;
-        if (path_realpath(presentPath.c_str(), path_real))
-            return -1;
-
-        snprintf(path, sizeof(path), "%s/%s",
-                    path_real, iter->second.presentAttr.c_str());
-        if (device_read(path, &value))
-            return -1;
-
-        if (value == PSU_PRESENT_ACTIVE)
-            return 1;
-        else
-            return 0;
-    }
-    catch (const std::exception& e) {
-        return -1;
-    }
-}
-
-int getPSUPowerGood(uint8_t psu)
-{
-    auto iter = psu_info.find(psu);
-    char path_real[PATH_MAX];
-    char path[PATH_MAX];
-    int value;
-
-    try {
-        auto pwrgdPath = iter->second.pwrgdPath;
-        if (path_realpath(pwrgdPath.c_str(), path_real))
-            return -1;
-
-        snprintf(path, sizeof(path), "%s/%s",
-                    path_real, iter->second.pwrgdAttr.c_str());
-        if (device_read(path, &value))
-            return -1;
-
-        if (value == PSU_PWROK_ACTIVE)
-            return 1;
-        else
-            return 0;
-    }
-    catch (const std::exception& e) {
-        return -1;
-    }
-}
-
-std::vector<uint8_t> getPSUMfrData(uint8_t psu, uint8_t reg, uint8_t length)
-{
-    auto iter = psu_info.find(psu);
-    char data[PMBUS_BLOCK_MAX];
-    std::vector<uint8_t> mfr_rev;
-
-    memset(data, 0xa, sizeof(data)); /* Init all value with LF char */
-    try {
-        auto pmbusSuid = iter->second.pmbusSuid;
-
-        if (psu_block_read(pmbusSuid.c_str(), reg, length, data))
-            memset(data, 0xa, sizeof(data));
-    }
-    catch (const std::exception& e) {
-        memset(data, 0xa, sizeof(data));
-    }
-
-    for (int i = 0; i < length; i++)
-        mfr_rev.push_back(data[i]);
-
-    return mfr_rev;
-}
 
 ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUInformation(uint8_t psu,
                                                              uint8_t num)
@@ -1006,34 +885,39 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUInformation(uint8_t psu,
     uint8_t info = 0;
     std::vector<uint8_t> values;
     auto iter = psu_info.find(psu);
+    OemPlatform platform;
 
     if (iter == psu_info.end())
         return ipmi::responseSensorInvalid();
 
     switch (num) {
         case PSU_INFO:
-            if (getPSUFanDirection(psu) == FAN_AFI)
+            if (platform.getPSUFanDirection(psu, iter) == FAN_AFI)
                 info |= FAN_AFI;
 
-            if (getPSUPresent(psu) == PRESENT)
+            if (platform.getPSUPresent(psu, iter) == PRESENT)
                 info |= (PRESENT << 1);
 
-            if (getPSUPowerGood(psu) == POWER_OK)
+            if (platform.getPSUPowerGood(psu, iter) == POWER_OK)
                 info |= (POWER_OK << 2);
 
             values.push_back(info);
             break;
         case PSU_MFR_REV:
-            values = getPSUMfrData(psu, PMBUS_MFR_REVISION, PSU_MFR_REV_LENGTH);
+            values = platform.getPSUMfrData(psu, iter, PMBUS_MFR_REVISION,
+                                                PSU_MFR_REV_LENGTH);
             break;
         case PSU_MFR_ID:
-            values = getPSUMfrData(psu, PMBUS_MFR_ID, PSU_MFR_ID_LENGTH);
+            values = platform.getPSUMfrData(psu, iter, PMBUS_MFR_ID,
+                                                PSU_MFR_ID_LENGTH);
             break;
         case PSU_MFR_MODEL:
-            values = getPSUMfrData(psu, PMBUS_MFR_MODEL, PSU_MFR_MODEL_LENGTH);
+            values = platform.getPSUMfrData(psu, iter, PMBUS_MFR_MODEL,
+                                                PSU_MFR_MODEL_LENGTH);
             break;
         case PSU_MFR_SERIAL:
-            values = getPSUMfrData(psu, PMBUS_MFR_SERIAL, PSU_MFR_SERIAL_LENGTH);
+            values = platform.getPSUMfrData(psu, iter, PMBUS_MFR_SERIAL,
+                                                PSU_MFR_SERIAL_LENGTH);
             break;
         default:
             return ipmi::responseCommandNotAvailable();
@@ -1042,116 +926,29 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetPSUInformation(uint8_t psu,
     return ipmi::responseSuccess(values);
 }
 
-enum fan_info_id
-{
-    FAN_INFO = 1,
-    FAN_PWM_DUTY,
-};
-
-int getFanDirection(uint8_t fan)
-{
-    auto iter = fan_info.find(fan);
-    char path_real[PATH_MAX];
-    char path[PATH_MAX];
-    int value;
-
-    try {
-        auto directionPath = iter->second.directionPath;
-        auto directionAttr = iter->second.directionAttr;
-        if (path_realpath(directionPath.c_str(), path_real))
-            return -1;
-
-        snprintf(path, sizeof(path), "%s/%s", path_real, directionAttr.c_str());
-        if (device_read(path, &value))
-            return -1;
-
-        if (value == FAN_AFI_ACTIVE)
-            return 1;
-        else
-            return 0;
-    }
-    catch (const std::exception& e) {
-        return -1;
-    }
-}
-
-int getFanPresent(uint8_t fan)
-{
-    auto iter = fan_info.find(fan);
-    char path_real[PATH_MAX];
-    char path[PATH_MAX];
-    int value;
-
-    try {
-        auto presentPath = iter->second.presentPath;
-        auto presentAttr = iter->second.presentAttr;
-        if (path_realpath(presentPath.c_str(), path_real))
-            return -1;
-
-        snprintf(path, sizeof(path), "%s/%s", path_real, presentAttr.c_str());
-        if (device_read(path, &value))
-            return -1;
-
-        if (value == FAN_PRESENT_ACTIVE)
-            return 1;
-        else
-            return 0;
-    }
-    catch (const std::exception& e) {
-        return -1;
-    }
-}
-
-int getFanPwm(uint8_t fan)
-{
-    auto iter = fan_info.find(fan);
-    char path_real[PATH_MAX];
-    char path[PATH_MAX];
-    int value;
-
-    try {
-        auto pwmPath = iter->second.pwmPath;
-        auto pwmAttr = iter->second.pwmAttr;
-        if (path_realpath(pwmPath.c_str(), path_real))
-            return -1;
-
-        snprintf(path, sizeof(path), "%s/%s", path_real, pwmAttr.c_str());
-        if (device_read(path, &value))
-            return -1;
-
-        if (value < 0 || value > 100 )
-            return -1;
-
-    }
-    catch (const std::exception& e) {
-        return -1;
-    }
-
-    return value;
-}
-
 ipmi::RspType<std::vector<uint8_t>> ipmiOemGetFanInformation(uint8_t fan,
                                                              uint8_t num)
 {
     uint8_t value = 0;
     std::vector<uint8_t> values;
     auto iter = fan_info.find(fan);
+    OemPlatform platform;
 
     if (iter == fan_info.end())
         return ipmi::responseSensorInvalid();
 
     switch (num) {
         case FAN_INFO:
-            if (getFanPresent(fan) == PRESENT)
+            if (platform.getFanPresent(fan, iter) == PRESENT)
                 value |= PRESENT;
 
-            if (getFanDirection(fan) == FAN_AFI)
+            if (platform.getFanDirection(fan, iter) == FAN_AFI)
                 value |= (FAN_AFI << 1);
 
             values.push_back(value);
             break;
         case FAN_PWM_DUTY:
-            value = getFanPwm(fan);
+            value = platform.getFanPwm(fan, iter);
             if (value > 100)
                 value = 0xff;
 
@@ -1164,17 +961,6 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetFanInformation(uint8_t fan,
     return ipmi::responseSuccess(values);
 }
 
-enum firmware_info_id
-{
-    BMC_PRIMARY_VER = 1,
-    BMC_BACKUP_VER,
-    CPLD0_VER,
-    CPLD1_VER,
-    CPLD2_VER,
-    FANCPLD_VER,
-    FPGA_VER,
-};
-
 std::vector<uint8_t> getCpldVersion(uint8_t fru)
 {
     auto iter = firmware_info.find(fru);
@@ -1183,6 +969,7 @@ std::vector<uint8_t> getCpldVersion(uint8_t fru)
     std::vector<uint8_t> values;
     int value = 0xff;
     std::string empty ("NULL");
+    OemPlatform platform;
 
     try {
         auto majorPath = iter->second.majorPath;
@@ -1193,6 +980,12 @@ std::vector<uint8_t> getCpldVersion(uint8_t fru)
         if (majorPath.compare(empty) == 0)
             values.push_back(0);
         else {
+            if (platform.getI2cMuxSel() > 0) {
+                values.push_back(0xff);
+                values.push_back(0xff);
+                return values;
+            }
+
             if (path_realpath(majorPath.c_str(), path_real))
                  value = 0xff;
 
@@ -1318,22 +1111,26 @@ ipmi::RspType<uint8_t> ipmiOemSetLEDStatus(uint8_t led,
     char ControlPath[PATH_MAX];
     char str_value[10] = {0};
     std::string empty ("NULL");
+    OemPlatform platform;
 
     auto ledForceModePath = iter->second.ledForceModePath;
     auto ledForceModeAttr = iter->second.ledForceModeAttr;
     auto ledControlPath = iter->second.ledControlPath;
     auto ledControlAttr = iter->second.ledControlAttr;
 
-    try {
-        if (ledControlPath.compare(empty) == 0)
-            return ipmi::responseCommandNotAvailable();
+    if (ledControlPath.compare(empty) == 0)
+        return ipmi::responseCommandNotAvailable();
 
+    try {
         switch (valueList.size())
         {
             case 1: /* Byte for LED force mode */
             case 2: /* Byte for LED control */
                 if (valueList.front() != 0 && valueList.front() != 1)
                     return ipmi::responseParmOutOfRange();
+
+                if (platform.getI2cMuxSel() > 0)
+                    return ipmi::responseResponseError();
 
                 if (path_realpath(ledForceModePath.c_str(), path_real))
                     return ipmi::responseDestinationUnavailable();
@@ -1380,6 +1177,7 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetLEDStatus(uint8_t led)
     int value;
     std::vector<uint8_t> values;
     std::string empty ("NULL");
+    OemPlatform platform;
 
     if (iter == led_info.end())
         return ipmi::responseCommandNotAvailable();
@@ -1391,8 +1189,15 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetLEDStatus(uint8_t led)
         if (ledStatusPath.compare(empty) == 0)
             value = 0;
         else {
-            if (path_realpath(ledStatusPath.c_str(), path_real))
+            if (platform.getI2cMuxSel() > 0) {
+                value = 0xff;
+                goto exit;
+            }
+
+            if (path_realpath(ledStatusPath.c_str(), path_real)) {
                  value = 0xff;
+                 goto exit;
+            }
 
             snprintf(path, sizeof(path), "%s/%s",
                      path_real, ledStatusrAttr.c_str());
@@ -1404,6 +1209,7 @@ ipmi::RspType<std::vector<uint8_t>> ipmiOemGetLEDStatus(uint8_t led)
         value = 0xff;
     }
 
+exit:
     values.push_back(value);
 
     return ipmi::responseSuccess(values);
