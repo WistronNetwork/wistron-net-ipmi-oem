@@ -17,6 +17,7 @@
 #pragma once
 
 #include <ipmid/api-types.hpp>
+#include <oem-common.hpp>
 
 namespace ipmi
 {
@@ -67,3 +68,11 @@ enum wistron_net_oem_cmds
 };
 
 } // namespace ipmi
+
+class OemPlatform : public OemCommon
+{
+  public:
+
+    OemPlatform() : OemCommon()
+    {}
+};
