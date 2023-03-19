@@ -14,15 +14,7 @@
 // limitations under the License.
 */
 
-#include <ipmid/api.hpp>
-#include <sdbusplus/message/types.hpp>
-#include <vector>
-#include <fstream>
-#include <filesystem>
-#include <string>
 #include <oem_platform.hpp>
-#include <led-info.hpp>
-#include <openbmc/misc-utils.h>
 
 using namespace phosphor::logging;
 
