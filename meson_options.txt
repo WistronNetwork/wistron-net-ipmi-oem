@@ -1,2 +1,2 @@
-option('platform-oem', type: 'feature', value: 'disabled', description: 'Enable platform_oemcommands contents')
+option('oem-platform', type: 'feature', value: 'disabled', description: 'Enable oem platform contents')
 option('sensor-yaml-gen', type: 'string', value: 'ipmi-sensors.yaml')

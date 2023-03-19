@@ -28,9 +28,9 @@ add_project_arguments(
   language : 'cpp')
 add_project_arguments(['-libstdc++fs'], language : 'cpp')
 
-platform_oemcommands_src = []
-if not get_option('platform-oem').disabled()
-  platform_oemcommands_src = ['src/platform_oemcommands.cpp']
+oem_platform_src = []
+if not get_option('oem-platform').disabled()
+  oem_platform_src = ['src/oem_platform.cpp']
 endif
 
 root_inc = include_directories('.', 'include')
@@ -76,7 +76,7 @@ zwistronoemcmds_lib = library(
   'src/firmware-info.cpp',
   'src/led-info.cpp',
   generated_src,
-  platform_oemcommands_src,
+  oem_platform_src,
   implicit_include_directories: false,
   dependencies: zwistronoemcmds_pre,
   version: meson.project_version(),
