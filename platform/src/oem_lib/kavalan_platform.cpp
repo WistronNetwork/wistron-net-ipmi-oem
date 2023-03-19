@@ -14,27 +14,12 @@
 // limitations under the License.
 */
 
-#include <ipmid/api.hpp>
-#include <sdbusplus/message/types.hpp>
-#include <vector>
-#include <fstream>
-#include <filesystem>
-#include <string>
-#include <phosphor-logging/log.hpp>
-#include <openbmc/obmc-i2c.h>
-#include <openbmc/misc-utils.h>
-#include <openbmc/psu.h>
-#include <psu-info.hpp>
-#include <oem_types.hpp>
+#include <oem_platform.hpp>
 
 using namespace phosphor::logging;
 
-namespace ipmi
+int OemPlatform::getPSUFanDirection(uint8_t psu, IdInfoMap_Psu::iterator iter)
 {
-
-int getPSUFanDirection(uint8_t psu)
-{
-    auto iter = psu_info.find(psu);
     char path[PATH_MAX];
     char data[32] = {0};
     int fd;
@@ -43,6 +28,11 @@ int getPSUFanDirection(uint8_t psu)
         return -1;
     else {
         try {
+            if (OemCommon::getI2cMuxSel() > 0) {
+                log<level::ERR>("getI2cMuxSel - PSU", entry("%d fail", psu));
+                return -1;
+            }
+
             auto eepromSuid = iter->second.eepromSuid;
             snprintf(path, sizeof(path), PSU_EEPROM, eepromSuid.c_str());
             fd = open(path, O_RDONLY);
@@ -67,5 +57,4 @@ int getPSUFanDirection(uint8_t psu)
             return -1;
         }
     }
-}
 }
