@@ -17,6 +17,7 @@
 #pragma once
 
 #include <ipmid/api-types.hpp>
+#include <oem-common.hpp>
 
 namespace ipmi
 {
@@ -35,6 +36,8 @@ enum wistron_oem_cmds
     WIS_CMD_SET_LED_STATUS = 0x29,
     WIS_CMD_GET_LED_STATUS = 0x2a,
     WIS_CMD_SET_FRU_MFG_DATE = 0x3f,
+    WIS_CMD_SET_CMIS_INFORMATION = 0x40,
+    WIS_CMD_GET_CMIS_INFORMATION = 0x41,
     WIS_CMD_SET_I2C_MUX_MASTER = 0x80,
     WIS_CMD_GET_I2C_MUX_MASTER = 0x81,
     WIS_CMD_SET_UART_MUX_MASTER = 0x82,
@@ -56,3 +59,11 @@ enum wistron_net_oem_cmds
 };
 
 } // namespace ipmi
+
+class OemPlatform : public OemCommon
+{
+    public:
+
+    OemPlatform() : OemCommon()
+    {}
+};
