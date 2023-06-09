@@ -105,3 +105,17 @@ struct LEDInfo
 using IdInfoMap_LED = std::map<uint8_t, LEDInfo>;
 
 extern IdInfoMap_LED led_info;
+
+struct XcvrInfo
+{
+    /** @brief Sysfs for XCVR present driver path */
+    std::string presentPath;
+    /** @brief Sysfs for XCVR present attributes */
+    std::string presentAttr;
+    /** @brief XCVR eeprom bus and address suid, ex. 24-0051 */
+    std::string eepromSuid;
+};
+
+using IdInfoMap_Xcvr = std::map<uint8_t, XcvrInfo>;
+
+extern IdInfoMap_Xcvr xcvr_info;

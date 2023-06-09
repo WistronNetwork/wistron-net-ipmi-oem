@@ -50,6 +50,7 @@ gpio_ctrl_dep = dependency('libgpio-ctrl')
 obmc_i2c_dep = dependency('libobmc-i2c')
 gpiodcxx_dep = dependency('libgpiodcxx')
 psu_dep = dependency('libpsu')
+xcvr_dep = dependency('libxcvr')
 
 zwistronoemcmds_pre = declare_dependency(
   include_directories: root_inc,
@@ -65,6 +66,7 @@ zwistronoemcmds_pre = declare_dependency(
     obmc_i2c_dep ,
     gpiodcxx_dep,
     psu_dep,
+    xcvr_dep,
   ])
 
 zwistronoemcmds_lib = library(
@@ -75,6 +77,7 @@ zwistronoemcmds_lib = library(
   'src/fan-info.cpp',
   'src/firmware-info.cpp',
   'src/led-info.cpp',
+  'src/xcvr-info.cpp',
   generated_src,
   oem_platform_src,
   implicit_include_directories: false,
