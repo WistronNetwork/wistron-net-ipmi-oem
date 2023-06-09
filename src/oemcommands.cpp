@@ -35,6 +35,7 @@
 #include <psu-info.hpp>
 #include <fan-info.hpp>
 #include <led-info.hpp>
+#include <xcvr-info.hpp>
 
 #ifndef FRU_BMC
 #define FRU_BMC 0x0
@@ -1215,6 +1216,22 @@ exit:
     return ipmi::responseSuccess(values);
 }
 
+ipmi::RspType<uint8_t> ipmiOemSetCMISInformation(
+                                                std::vector<uint8_t> valueVec)
+{
+    OemPlatform platform;
+
+    return platform.setXcvrData(valueVec);
+}
+
+ipmi::RspType<std::vector<uint8_t>> ipmiOemGetCMISInformation(
+                                                 std::vector<uint8_t> valueVec)
+{
+    OemPlatform platform;
+
+    return platform.getXcvrData(valueVec);
+}
+
 void registerOEMFunctions()
 {
     phosphor::logging::log<level::INFO>(
@@ -1263,5 +1280,9 @@ void registerOEMFunctions()
             ipmi::Privilege::User, ipmiOemSetLEDStatus);
     ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_LED_STATUS,
             ipmi::Privilege::User, ipmiOemGetLEDStatus);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_SET_CMIS_INFORMATION,
+            ipmi::Privilege::User, ipmiOemSetCMISInformation);
+    ipmi::registerHandler(ipmi::prioOemBase, ipmi::netFnOemOne, WIS_CMD_GET_CMIS_INFORMATION,
+            ipmi::Privilege::User, ipmiOemGetCMISInformation);
 }
 }
