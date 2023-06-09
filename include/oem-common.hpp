@@ -28,6 +28,7 @@
 #include <openbmc/libgpio.h>
 #include <openbmc/misc-utils.h>
 #include <openbmc/psu.h>
+#include <openbmc/xcvr-optoe.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <ipmid/utils.hpp>
@@ -35,6 +36,7 @@
 #include <psu-info.hpp>
 #include <fan-info.hpp>
 #include <led-info.hpp>
+#include <xcvr-info.hpp>
 
 #define PMBUS_BLOCK_MAX 32
 
@@ -64,6 +66,11 @@ enum fan_info_id
 {
     FAN_INFO = 1,
     FAN_PWM_DUTY,
+};
+
+enum cmis_function
+{
+    CMIS_RAW_DATA = 1,
 };
 
 class OemCommon
@@ -383,5 +390,159 @@ class OemCommon
             }
 
             return value;
+        }
+
+        /** @brief Get xcvr present status
+         *
+         *  @returns
+         *  -1: Fail
+         *   0: Not present
+         *   1: Present
+         */
+        virtual int getXcvrPresent(uint8_t port, IdInfoMap_Xcvr::iterator iter)
+        {
+            char path_real[PATH_MAX];
+            char path[PATH_MAX];
+            int value;
+
+            if (getI2cMuxSel() > 0) {
+                log<level::ERR>("getI2cMuxSel - XCVR", entry("%d fail", port));
+                return -1;
+            }
+
+            try {
+                auto presentPath = iter->second.presentPath;
+                auto presentAttr = iter->second.presentAttr;
+                if (path_realpath(presentPath.c_str(), path_real))
+                    return -1;
+
+                snprintf(path, sizeof(path), "%s/%s", path_real,
+                         presentAttr.c_str());
+                if (device_read(path, &value))
+                    return -1;
+
+                if (value == XCVR_PRESENT_ACTIVE)
+                    return 1;
+                else
+                    return 0;
+            }
+            catch (const std::exception& e) {
+                return -1;
+            }
+        }
+
+        /** @brief Set xcvr raw data
+         *
+         *  @returns
+         *  ipmi::Rsptype
+         */
+        virtual ipmi::RspType<uint8_t> setXcvrData(
+                                                std::vector<uint8_t> valueVec)
+        {
+            if  (valueVec.size() < 5)
+                return ipmi::responseReqDataLenInvalid();
+
+            uint8_t port = valueVec[0];
+            uint8_t function = valueVec[1];
+            uint8_t page = valueVec[2];
+            uint8_t offset = valueVec[3];
+            auto iter = xcvr_info.find(port);
+            std::string empty ("NULL");
+            uint8_t *wbuf = &valueVec[4];
+            int wbuf_size = valueVec.size() - 4;
+
+            if (iter->second.eepromSuid.compare(empty) == 0)
+                return ipmi::responseCommandNotAvailable();
+
+            if  (wbuf_size == 0 || wbuf_size > 256)
+                return ipmi::responseReqDataLenInvalid();
+
+            if (getI2cMuxSel() > 0) {
+                log<level::ERR>("getI2cMuxSel - XCVR", entry("%d fail", port));
+                return ipmi::responseCommandNotAvailable();
+            }
+
+            try {
+                if (function == CMIS_RAW_DATA) {
+                    std::string xcvrEepromPath = I2C_SYSFS_DEVICES;
+
+                    xcvrEepromPath.append("/");
+                    xcvrEepromPath.append(iter->second.eepromSuid).append("/eeprom");
+
+                    XcvrOptoe eeprom(xcvrEepromPath.c_str());
+                    if (eeprom.write_raw(page, offset, wbuf_size, wbuf))
+                        return ipmi::responseDestinationUnavailable();
+                } else {
+                    return ipmi::responseInvalidFieldRequest();
+                }
+            }
+            catch (const std::exception& e) {
+                return ipmi::responseUnspecifiedError();
+            }
+
+            return ipmi::responseSuccess();
+        }
+
+        /** @brief Get xcvr raw data
+         *
+         *  @returns
+         *  ipmi::Rsptype
+         */
+        virtual ipmi::RspType<std::vector<uint8_t>> getXcvrData(
+                                                std::vector<uint8_t> valueVec)
+        {
+
+            if  (valueVec.size() != 5)
+                return ipmi::responseReqDataLenInvalid();
+
+            uint8_t port = valueVec[0];
+            uint8_t function = valueVec[1];
+            uint8_t page = valueVec[2];
+            uint8_t offset = valueVec[3];
+            uint8_t length = valueVec[4];
+            auto iter = xcvr_info.find(port);
+            std::string empty ("NULL");
+            int data_length = length;
+            std::vector<uint8_t> rdatas;
+
+            if (iter == xcvr_info.end())
+                return ipmi::responseCommandNotAvailable();
+
+            if (iter->second.eepromSuid.compare(empty) == 0)
+                return ipmi::responseCommandNotAvailable();
+
+            if (getI2cMuxSel() > 0) {
+                log<level::ERR>("getI2cMuxSel - XCVR", entry("%d fail", port));
+                return ipmi::responseCommandNotAvailable();
+            }
+
+            try {
+                if (length == 0)
+                    data_length = 256;
+
+                if (function == CMIS_RAW_DATA) {
+                    std::string eepromPath = I2C_SYSFS_DEVICES;
+                    uint8_t *rbuf =
+                              (uint8_t *) malloc(data_length * sizeof(uint8_t));
+
+                    eepromPath.append("/");
+                    eepromPath.append(iter->second.eepromSuid).append("/eeprom");
+
+                    XcvrOptoe eeprom(eepromPath.c_str());
+                    if (eeprom.read_raw(page, offset, data_length, rbuf)) {
+                        free(rbuf);
+                        return ipmi::responseDestinationUnavailable();
+                    }
+                    rdatas.insert(rdatas.begin(), rbuf, rbuf + data_length);
+                    free(rbuf);
+                } else {
+                    return ipmi::responseInvalidFieldRequest();
+                }
+            }
+            catch (const std::exception& e) {
+                return ipmi::responseUnspecifiedError();
+            }
+
+            return ipmi::responseSuccess(rdatas);
         }
 }; // class OemCommon
