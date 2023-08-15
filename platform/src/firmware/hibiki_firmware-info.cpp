@@ -17,8 +17,8 @@
 #include <openbmc/obmc-i2c.h>
 #include <oem_types.hpp>
 
-#define CPLD0_PATH I2C_SYSFS_DEV_DIR(1-0066)"/hwmon"
-#define FANCPLD_PATH I2C_SYSFS_DEV_DIR(18-0016)"/hwmon"
+#define CPLD0_PATH I2C_SYSFS_DEV_DIR(1-0033)"/hwmon"
+#define FANCPLD_PATH I2C_SYSFS_DEV_DIR(22-0027)"/hwmon"
 
 IdInfoMap_Firmware firmware_info = {
     {
@@ -49,7 +49,7 @@ IdInfoMap_Firmware firmware_info = {
         }
     },
     {
-        6, /* For FANCPLD */
+        4, /* For FANCPLD */
         {
             .majorPath = FANCPLD_PATH,
             .majorAttr = "fancpld_version",

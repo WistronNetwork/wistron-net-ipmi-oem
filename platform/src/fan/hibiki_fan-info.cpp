@@ -17,7 +17,7 @@
 #include <openbmc/obmc-i2c.h>
 #include <oem_types.hpp>
 
-#define FANCPLD_PATH I2C_SYSFS_DEV_DIR(18-0016)"/hwmon"
+#define FANCPLD_PATH I2C_SYSFS_DEV_DIR(22-0027)"/hwmon"
 
 IdInfoMap_Fan fan_info = {
     {

@@ -16,52 +16,45 @@
 
 #include <openbmc/obmc-i2c.h>
 #include <oem_types.hpp>
+#include <led-info.hpp>
 
-#define CPLD0_PATH I2C_SYSFS_DEV_DIR(1-0066)"/hwmon"
+#define CPLD0_PATH I2C_SYSFS_DEV_DIR(1-0033)"/hwmon"
 
-IdInfoMap_LED led_info = {
+Hibiki_IdInfoMap_LED hibiki_led_info = {
     {
         1, /* For System LED */
         {
-            .ledStatusPath = CPLD0_PATH,
-            .ledStatusrAttr = "sys_led_status",
-            .ledControlPath = CPLD0_PATH,
-            .ledControlAttr = "sys_led_force_control",
+            .ledColorPath = CPLD0_PATH,
+            .ledColorAttr = "sys_led_color_control",
             .ledForceModePath = CPLD0_PATH,
-            .ledForceModeAttr = "sys_led_force_enable",
+            .ledForceModeAttr = "led_force_control",
         }
     },
     {
-        2, /* For PSU LED */
+        2, /* For Fan LED */
         {
-            .ledStatusPath = CPLD0_PATH,
-            .ledStatusrAttr = "psu_led_status",
-            .ledControlPath = CPLD0_PATH,
-            .ledControlAttr = "psu_led_force_control",
+            .ledColorPath = CPLD0_PATH,
+            .ledColorAttr = "fan_led_color_control",
             .ledForceModePath = CPLD0_PATH,
-            .ledForceModeAttr = "psu_led_force_enable",
+            .ledForceModeAttr = "led_force_control",
         }
     },
     {
-        3, /* For Fan LED */
+        3, /* For PSU LED */
         {
-            .ledStatusPath = CPLD0_PATH,
-            .ledStatusrAttr = "fan_led_status",
-            .ledControlPath = CPLD0_PATH,
-            .ledControlAttr = "fan_led_force_control",
+            .ledColorPath = CPLD0_PATH,
+            .ledColorAttr = "psu_led_color_control",
             .ledForceModePath = CPLD0_PATH,
-            .ledForceModeAttr = "fan_led_force_enable",
+            .ledForceModeAttr = "led_force_control",
         }
     },
     {
         4, /* For LOC LED */
         {
-            .ledStatusPath = CPLD0_PATH,
-            .ledStatusrAttr = "loc_led_status",
-            .ledControlPath = CPLD0_PATH,
-            .ledControlAttr = "loc_led_force_control",
+            .ledColorPath = CPLD0_PATH,
+            .ledColorAttr = "loc_led_color_control",
             .ledForceModePath = CPLD0_PATH,
-            .ledForceModeAttr = "loc_led_force_enable",
+            .ledForceModeAttr = "led_force_control",
         }
     },
 };

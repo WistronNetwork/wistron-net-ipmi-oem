@@ -18,7 +18,7 @@
 #include <oem_types.hpp>
 #include <oemcommands.hpp>
 
-#define CPLD0_PATH I2C_SYSFS_DEV_DIR(1-0066)"/hwmon"
+#define CPLD0_PATH I2C_SYSFS_DEV_DIR(1-0033)"/hwmon"
 
 IdInfoMap_Psu psu_info = {
     {
@@ -89,13 +89,5 @@ IdInfoMap_oem oem_psusensors = {
     {
         FAN_PWM1,
         {.sensorPath = PSUn_FAN_PWM1,}
-    },
-    {
-        FAN_TACH2,
-        {.sensorPath = "/xyz/openbmc_project/sensors/fan_tach/PSUn_FAN_TACH2",}
-    },
-    {
-        FAN_PWM2,
-        {.sensorPath = PSUn_FAN_PWM2,}
     },
 };

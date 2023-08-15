@@ -19,7 +19,7 @@
 #include <ipmid/api-types.hpp>
 #include <oem_types.hpp>
 
-#define FRU_MAX 9
+#define FRU_MAX 6
 
 const char* frulist[FRU_MAX] = {
     "/sys/bus/i2c/devices/0-0054/eeprom",  // fru 0: BMC
