@@ -428,42 +428,64 @@ ipmi::RspType<> ipmiOemSetFruMfgDate(uint8_t fru, uint8_t lsbdate,
                                      uint8_t middate, uint8_t msbdate)
 {
     FILE *fp;
-    uint8_t buffer[3] = {};
-    size_t numread, numwritten;
+    uint8_t buffer[256] = {};
     uint8_t date_offset;
+    int i;
+    int board_length;
+    int checksum = 0;
 
     if (FRU_MAX <= 0)
         return responseOutOfSpace();
+
     fp = fopen(frulist[fru],"rb+");
     if (NULL == fp) {
         return ipmi::responseUnspecifiedError();
     } else {
         if (fru == FRU_BMC) {
-            fseek (fp , 32 + 3, SEEK_SET);
+            fseek(fp , 32 + 3, SEEK_SET);
         } else {
-            fseek (fp , 3, SEEK_SET);
+            fseek(fp , 3, SEEK_SET);
         }
 
-        memset(buffer, 0, 1);
-        numread = fread(buffer, 1, 1, fp);
+        memset(buffer, 0, sizeof(buffer));
 
-        if (numread == 0) {
+        if (fread(buffer, 1, 1, fp) == 0) {
             fclose(fp);
             return ipmi::responseUnspecifiedError();
         }
+
         if (fru == FRU_BMC) {
-            date_offset = buffer[0] * 8 + 32 + 3;
+            date_offset = buffer[0] * 8 + 32;
         } else {
-            date_offset = buffer[0] * 8 + 3;
+            date_offset = buffer[0] * 8;
         }
 
-        fseek (fp , date_offset, SEEK_SET);
-        buffer[0] = lsbdate;
-        buffer[1] = middate;
-        buffer[2] = msbdate;
+        memset(buffer, 0, sizeof(buffer));
+        fseek(fp , date_offset, SEEK_SET);
+        if (fread(buffer, 1, 2, fp) == 0) {
+            fclose(fp);
+            return ipmi::responseUnspecifiedError();
+        }
 
-        numwritten = fwrite(buffer, 1, 3, fp);
-        if (numwritten == 0) {
+        board_length = buffer[1] * 8;
+
+        fseek(fp , date_offset, SEEK_SET);
+        memset(buffer, 0, sizeof(buffer));
+        if (fread(buffer, 1, board_length, fp) == 0) {
+            fclose(fp);
+            return ipmi::responseUnspecifiedError();
+        }
+
+        buffer[3] = lsbdate;
+        buffer[4] = middate;
+        buffer[5] = msbdate;
+
+        for(i = 0; i < board_length - 1; i++)
+            checksum += buffer[i];
+        buffer[board_length-1] = (~checksum + 1) & 0xff;
+
+        fseek(fp , date_offset, SEEK_SET);
+        if (fwrite(buffer, 1, board_length, fp) == 0) {
             fclose(fp);
             return ipmi::responseUnspecifiedError();
         }
