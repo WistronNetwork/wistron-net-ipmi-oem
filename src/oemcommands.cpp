@@ -397,8 +397,7 @@ ipmi::RspType<uint8_t, uint8_t> ipmiOemGetFanSpeedControl(Context::ptr& ctx)
         mode = ipmi::Value(true);
     }
 
-
-    stream = popen("/usr/local/bin/fan-util --get", "r");
+    stream = popen("/usr/local/bin/fan-util --get | cut -d : -f 3", "r");
     if (stream) {
         while (!feof(stream)) {
             if (fgets(buffer, MAX_BUFFER, stream) != NULL) {
@@ -411,12 +410,12 @@ ipmi::RspType<uint8_t, uint8_t> ipmiOemGetFanSpeedControl(Context::ptr& ctx)
             return ipmi::responseUnspecifiedError();
         }
 
-        /* fan-util output format should like below:
-           Example - "Fan 1 RPM: 12344 PWM: 100 %".
-           PWM value will be index 5 after do string split.
+        /* fan-util stream output format (after cut) should like below:
+           Example - " 100 %".
+           PWM value will be index 1 after do string split.
            If the format is different, it might got error */
         boost::split(result, value, boost::is_any_of(" "));
-        duty = boost::numeric_cast<uint8_t>(boost::lexical_cast<int>(result[5]));
+        duty = boost::numeric_cast<uint8_t>(boost::lexical_cast<int>(result[1]));
     } else {
         return ipmi::responseUnspecifiedError();
     }
