@@ -16,7 +16,7 @@
 
 #pragma once
 
-#define PSU_PRESENT_ACTIVE 0
+#define PSU_PRESENT_ACTIVE 1
 #define PSU_PWROK_ACTIVE   1
 
 enum psu_mfr_length {
