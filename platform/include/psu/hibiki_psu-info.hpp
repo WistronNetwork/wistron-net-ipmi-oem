@@ -20,8 +20,8 @@
 #define PSU_PWROK_ACTIVE   1
 
 enum psu_mfr_length {
-    PSU_MFR_REV_LENGTH = 0x3,
+    PSU_MFR_REV_LENGTH = 0x2,
     PSU_MFR_ID_LENGTH = 0x5,
-    PSU_MFR_MODEL_LENGTH = 0xe,
-    PSU_MFR_SERIAL_LENGTH = 0xd,
+    PSU_MFR_MODEL_LENGTH = 0xc,
+    PSU_MFR_SERIAL_LENGTH = 0xb,
 };

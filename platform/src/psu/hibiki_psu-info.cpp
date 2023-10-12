@@ -24,8 +24,8 @@ IdInfoMap_Psu psu_info = {
     {
         1,
         {
-            .pmbusSuid = "20-0059",
-            .eepromSuid = "20-0051",
+            .pmbusSuid = "20-005a",
+            .eepromSuid = "20-0052",
             .presentPath = CPLD0_PATH,
             .presentAttr = "fm_present_psu1_n",
             .pwrgdPath = CPLD0_PATH,
@@ -35,8 +35,8 @@ IdInfoMap_Psu psu_info = {
     {
         2,
         {
-            .pmbusSuid = "20-005a",
-            .eepromSuid = "20-0052",
+            .pmbusSuid = "20-0059",
+            .eepromSuid = "20-0051",
             .presentPath = CPLD0_PATH,
             .presentAttr = "fm_present_psu2_n",
             .pwrgdPath = CPLD0_PATH,
@@ -56,23 +56,23 @@ IdInfoMap_oem oem_psusensors = {
     },
     {
         PIN_AC,
-        {.sensorPath = "/xyz/openbmc_project/sensors/power/PSUn_PIN_AC",}
-    },
-    {
-        POUT_DC,
-        {.sensorPath = "/xyz/openbmc_project/sensors/power/PSUn_POUT_DC",}
-    },
-    {
-        IIN_AC,
         {.sensorPath = "/xyz/openbmc_project/sensors/current/PSUn_IIN_AC",}
     },
     {
-        IOUT_DC,
+        POUT_DC,
         {.sensorPath = "/xyz/openbmc_project/sensors/current/PSUn_IOUT_DC",}
     },
     {
+        IIN_AC,
+        {.sensorPath = "/xyz/openbmc_project/sensors/power/PSUn_PIN_AC",}
+    },
+    {
+        IOUT_DC,
+        {.sensorPath = "/xyz/openbmc_project/sensors/power/PSUn_POUT_DC",}
+    },
+    {
         TMP,
-        {.sensorPath = "/xyz/openbmc_project/sensors/temperature/PSUn_TMP",}
+        {.sensorPath = "/xyz/openbmc_project/sensors/temperature/PSUn_TMP1",}
     },
     {
         TMP2,
