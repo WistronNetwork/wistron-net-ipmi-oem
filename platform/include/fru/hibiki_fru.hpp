@@ -31,4 +31,6 @@ const char* frulist[FRU_MAX] = {
 };
 
 IdInfoMap_External_Sensor oem_externalsensors = {
+    {1,{.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/M2_SATA_TMP"}},
+    {2,{.size = 1, .path = "/xyz/openbmc_project/sensors/temperature/M2_NVME_TMP"}},
 };
